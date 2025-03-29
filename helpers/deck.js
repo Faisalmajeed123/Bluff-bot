@@ -14,7 +14,7 @@ const VALUES = [
   "Q",
   "K",
 ];
-class Deck {
+export class Deck {
   constructor(cards = freshDeck()) {
     this.cards = cards;
   }
@@ -30,7 +30,7 @@ class Deck {
     }
   } // this will shuffle the cards but the length will remain same
 }
-class Card {
+export class Card {
   constructor(suit, value) {
     this.suit = suit;
     this.value = value;
@@ -47,5 +47,3 @@ function freshDeck() {
 // suite and so on untill all 52 loop are not completed. So the outer loop will run 4 times and inner will run 52 times
 
 //module.exports=Deck;
-exports.Card = Card;
-exports.Deck = Deck;

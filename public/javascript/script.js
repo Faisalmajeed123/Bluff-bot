@@ -4,11 +4,10 @@ var newGame;
 
 var lastGameCardCount = 0;
 var lastGameBluffText = "Nothing";
+let lastNotification = "";
 
+const botIds = [1];
 var socket = io();
-
-console.log("Server IP address : " + location.host);
-
 const audioFilesAddress = "http://" + location.host + "/";
 
 var audioRaiseTime = new Audio(audioFilesAddress + "rise-time.mp3");
@@ -16,56 +15,137 @@ var audioCardsShuffling = new Audio(audioFilesAddress + "cards-shuffling.mp3");
 var audioCardsPlaced = new Audio(audioFilesAddress + "cards-placed.mp3");
 var audioCardsRaised = new Audio(audioFilesAddress + "cards-raised.mp3");
 
-// To prevent adding listeners while sorting
 var listenNodeInserted = true;
 
 function notifyScreenReader(text, priority) {
+  if (text === lastNotification) return;
+  lastNotification = text;
   var el = document.createElement("div");
   var id = "speak-" + Date.now();
   el.setAttribute("id", id);
   el.setAttribute("aria-live", priority || "polite");
-  //el.classList.add("visually-hidden");
   document.body.appendChild(el);
 
   window.setTimeout(function () {
     document.getElementById(id).innerHTML = text;
-  }, 1000);
+  }, 500);
+  lastNotification = "";
 
   window.setTimeout(function () {
     document.body.removeChild(document.getElementById(id));
   }, 10000);
 }
 
+function botSelectCards() {
+  const cardContainer = document.getElementById("card-container");
+  if (!cardContainer || cardContainer.children.length === 0) {
+    console.log("No cards available for selection!");
+    return;
+  }
+
+  const allCards = Array.from(cardContainer.children);
+  const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
+  const shuffledCards = [...allCards].sort(() => Math.random() - 0.5);
+  const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
+
+  selectedCards.forEach((card) => {
+    card.selected = true;
+    card.setAttribute("title", "Selected");
+    card.style.backgroundColor = "#81ea74";
+  });
+
+  notifyScreenReader(`Bot selected ${selectedCards.length} cards`, "assertive");
+  document.getElementById("place-btn").click();
+
+  const bluffTexts = [
+    "A",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K",
+  ];
+  const bluffText = bluffTexts[Math.floor(Math.random() * bluffTexts.length)];
+
+  notifyScreenReader(`Bot entered ${bluffText} as Bluff Text`, "assertive");
+
+  window.prompt = function () {
+    return bluffText;
+  };
+  const event = new KeyboardEvent("keydown", {
+    key: "Enter",
+    code: "Enter",
+    keyCode: 13,
+  });
+  document.dispatchEvent(event);
+}
+
+const handleBotMove = () => {
+  const moves = ["place", "raise", "pass"];
+  const probabilities = [0.1, 0.4, 0.5];
+  let random = Math.random();
+  let cumulativeProbability = 0;
+  for (let i = 0; i < moves.length; i++) {
+    cumulativeProbability += probabilities[i];
+    if (random < cumulativeProbability) {
+      return moves[i];
+    }
+  }
+  return moves[moves.length - 1];
+};
+
+function handleBotTurn(botId) {
+  const botMove = handleBotMove();
+  notifyScreenReader(`Bot ${botId + 1} chooses to: ${botMove}`, "assertive");
+  return botMove;
+}
+
 const playedContainer = document.getElementById("container_played");
 
-const card_container = document.getElementById("card-container");
-card_container.addEventListener("DOMNodeInserted", function () {
-  if (listenNodeInserted) {
-    console.log("Item added to container cards");
+const observer = new MutationObserver((mutations, obs) => {
+  mutations.forEach((mutation) => {
+    mutation.addedNodes.forEach((node) => {
+      if (node.nodeType === 1 && !node.hasAttribute("processed")) {
+        node.setAttribute("processed", "true");
+        const card_id = node.id;
+        node.setAttribute("tabindex", "0");
+        node.addEventListener(
+          "keydown",
+          (event) => {
+            if (event.key === "Enter") {
+              const card = document.getElementById(card_id);
+              card.selected = true;
 
-    const card_id = card_container.lastChild.id;
-
-    ["click", "keydown"].forEach(function (evt) {
-      card_container.lastElementChild.addEventListener(evt, (event) => {
-        if (evt == "click" || (evt == "keydown" && event.keyCode == 13)) {
-          const card = document.getElementById(card_id);
-
-          card.selected = !card.selected;
-
-          if (card.selected) {
-            notifyScreenReader(card_id + " Selected");
-            card.setAttribute("title", "Selected");
-            card.style.backgroundColor = "#81ea74";
-          } else {
-            notifyScreenReader(card_id + " Removed");
-            card.setAttribute("title", "Unselected");
-            card.style.backgroundColor = "#b963ee";
-          }
-        }
-      });
+              if (card.selected) {
+                notifyScreenReader(card_id + " Selected");
+                card.setAttribute("title", "Selected");
+                card.style.backgroundColor = "#81ea74";
+              } else {
+                notifyScreenReader(card_id + " Removed");
+                card.setAttribute("title", "Unselected");
+                card.style.backgroundColor = "#b963ee";
+              }
+            }
+          },
+          { once: true }
+        );
+      }
     });
-  }
+  });
 });
+
+const card_container = document.getElementById("card-container");
+if (card_container) {
+  observer.observe(card_container, { childList: true });
+}
 
 document.addEventListener("keydown", (event) => {
   // Pass
@@ -290,8 +370,23 @@ socket.on("STOC-SET-WHOS-TURN", (value, value2) => {
     }
     messageWhosTurn = messageWhosTurn.concat("It's your turn!");
   } else {
-    placeBtn.disabled = true;
-    passBtn.disabled = true;
+    placeBtn.disabled = false;
+    passBtn.disabled = false;
+    const botTurn = handleBotTurn(whosTurn);
+    if (botTurn === "raise") {
+      window.setTimeout(function () {
+        document.getElementById("raise-btn").click();
+        document.getElementById("pass-btn").click();
+      }, 2000);
+    } else if (botTurn === "pass") {
+      window.setTimeout(function () {
+        document.getElementById("pass-btn").click();
+      }, 2000);
+    } else if (botTurn === "place") {
+      window.setTimeout(function () {
+        botSelectCards();
+      }, 2000);
+    }
     messageWhosTurn = messageWhosTurn.concat(
       "It's " + (whosTurn + 1) + " turn!"
     );
@@ -361,7 +456,7 @@ socket.on("STOC-RAISE-TIME-START", () => {
   console.log("raise time starts");
   if (pos != whosTurn) {
     const raiseBtn = document.getElementById("raise-btn");
-    raiseBtn.disabled = false;
+    raiseBtn.disabled = true;
   }
   notifyScreenReader("Raise time starts!", "assertive");
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
@@ -377,7 +472,7 @@ socket.on("STOC-RAISE-TIME-OVER", () => {
   audioRaiseTime.pause();
   audioRaiseTime.currentTime = 0;
   const raiseBtn = document.getElementById("raise-btn");
-  raiseBtn.disabled = true;
+  raiseBtn.disabled = false;
   notifyScreenReader("Raise time over!", "assertive");
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
   areaRaiseSpinner.innerHTML = "";

@@ -1,141 +1,147 @@
+.playersContainer {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+}
 
-  .playersContainer {
-    display: flex;
-    justify-content: center;
-    gap: 9px;
-  }
+.cards {
+  height: 120px;
+  border-radius: 8px;
+  /*border: solid;*/
+  /*border-width: 1px;*/
+  background-color: #cccccc;
+}
 
-  .cards {
-    height: 120px;
-    border-radius: 8px;
-    /*border: solid;*/
-    /*border-width: 1px;*/
-    background-color: #cccccc;
-  }
+.cards:focus {
+  outline: none !important;
+  border: 3px solid red;
+  box-shadow: 0 0 10px #719ece;
+}
 
-  .cards:focus {
-    outline: none !important;
-    border:3px solid red;
-    box-shadow: 0 0 10px #719ECE;
-  }
+.cardsContainer {
+  display: flex;
+  gap: 5px;
+  margin-top: 15px;
+  overflow-x: scroll;
+  /* justify-content: center;*/
+}
 
-  .cardsContainer {
-    display: flex;
-    gap: 5px;
-    margin-top: 15px;
-    overflow-x: scroll;
-    /* justify-content: center;*/
-  }
+.playGround {
+  display: flex;
+  /*height: 100%;*/
+  align-items: center;
+  justify-content: space-between;
+}
 
-  .playGround {
-    display: flex;
-    /*height: 100%;*/
-    align-items: center;
-    justify-content: space-between;
-  }
+.buttonContainer {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
 
-  .buttonContainer {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-  }
+.selectionContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-  .selectionContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
+.user {
+  display: flex;
+  flex-direction: column;
+  font-size: 20px;
+  align-items: center;
+  border: solid;
+  border-width: 1px;
+}
 
-  .user {
-    display: flex;
-    flex-direction: column;
-    font-size: 20px;
-    align-items: center;
-    border: solid;
-    border-width: 1px;
-  }
-
-  /*.friendsContainer {
+/*.friendsContainer {
     display: flex;
     gap: 5px;
   }*/
 
-  button {
-    border: 3px solid #000000;
-    background-color: #33ff00;
-    color: #000000;
-    padding: 5px 10px;
-  }
-  
-  button:hover {
-    border: 3px solid #0099cc;
-    background-color: #0044fd;
-    color: #ffffff;
-    padding: 5px 10px;
-  }
-  
-  button:disabled,
-  button[disabled]{
-    border: 3px solid #000000;
-    background-color: #ff0000;
-    color: #000000;
-  }
+button {
+  border: 3px solid #000000;
+  background-color: #33ff00;
+  color: #000000;
+  padding: 5px 10px;
+}
 
-  .loading-animation {
-    /* Add your loading animation styles here */
-    /* For example, you can use a CSS spinner animation */
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    animation: spin 2s linear infinite;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
+button:hover {
+  border: 3px solid #0099cc;
+  background-color: #0044fd;
+  color: #ffffff;
+  padding: 5px 10px;
+}
 
-  .text-element {
-    margin-top: 10px;
-    text-align: center;
+button:disabled,
+button[disabled] {
+  border: 3px solid #000000;
+  background-color: #ff0000;
+  color: #000000;
+}
 
-  }
+.loading-animation {
+  /* Add your loading animation styles here */
+  /* For example, you can use a CSS spinner animation */
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 2s linear infinite;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
 
-  .loader {
-    border: 16px solid #f3f3f3;
-    border-radius: 50%;
-    border-top: 16px solid #3498db;
-    width: 120px;
-    height: 120px;
-    -webkit-animation: spin 2s linear infinite; /* Safari */
-    animation: spin 2s linear infinite;
-  }
-  
-  /* Safari */
-  @-webkit-keyframes spin {
-    0% { -webkit-transform: rotate(0deg); }
-    100% { -webkit-transform: rotate(360deg); }
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
+.text-element {
+  margin-top: 10px;
+  text-align: center;
+}
 
-  .split {
-    height: 50%;
-    width: 50%;
-    position: fixed;
-    z-index: 1;
-    overflow-x: hidden;
-    padding-top: 20px;
+.loader {
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #3498db;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+
+/* Safari */
+@-webkit-keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
   }
-  
-  .left {
-    left: 0;
+  100% {
+    -webkit-transform: rotate(360deg);
   }
-  
-  .right {
-    right: 0;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
   }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.split {
+  height: 50%;
+  width: 50%;
+  position: fixed;
+  z-index: 1;
+  overflow-x: hidden;
+  padding-top: 20px;
+}
+
+.left {
+  left: 0;
+}
+
+.right {
+  right: 0;
+}

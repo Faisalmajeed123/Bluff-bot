@@ -1,22 +1,25 @@
-var express = require("express");
-var app = express();
-var http = require("http").createServer(app);
-var io = require("socket.io")(http);
-var serverfn = require("./helpers/ServerFunctions");
-var path = require("path");
-const hbs = require("hbs");
-// Set up the view engine to use HBS
-app.set("view engine", "hbs");
-// Set the location of the views directory
-app.set("views", __dirname + "/views");
-app.use(express.static(path.join(__dirname, "public")));
-var Deck = require("./helpers/deck");
-const { Socket } = require("socket.io");
-const { TIMEOUT } = require("dns");
-var router = express.Router();
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+import hbs from "hbs";
+import * as serverfn from "./helpers/ServerFunctions.js";
+import * as Deck from "./helpers/deck.js";
+import { v4 as uuidv4 } from "uuid";
+// Setup __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer);
+const router = express.Router();
 const CardDeck = new Deck.Deck();
-const { v4: uuidv4 } = require("uuid");
 const rooms = {};
+app.set("view engine", "hbs");
+app.set("views", path.join(__dirname, "views"));
+app.use(express.static("public"));
 
 console.log("ROOMS", rooms);
 app.get("/", (req, res) => {
@@ -29,6 +32,7 @@ io.on("connection", (socket) => {
   console.log("New connection established. User connected with ID:", socket.id);
   // Find or create a room with available capacity
   let roomId;
+  let lastPlayedCardCount = 0;
   for (const [room, count] of Object.entries(roomCounts)) {
     if (count < roomCapacity) {
       roomId = room;
@@ -49,7 +53,7 @@ io.on("connection", (socket) => {
       wonUsers: [],
       // Add other room-specific variables as needed
       lastPlayedCardCount: undefined,
-      currentTurnIndex: -1, // Index of the current turn player
+      currentTurnIndex: 0, // Index of the current turn player(change this to shift first user turns)
       playinguserfail: false,
       newGame: true,
       bluff_text: undefined,
@@ -295,6 +299,8 @@ function changeTurn(roomId) {
   }
 }
 
-http.listen(3000, () => {
+httpServer.listen(3000, () => {
   console.log("connected to server");
 });
+
+export { app, httpServer, io, router, rooms };
