@@ -36,76 +36,108 @@ function notifyScreenReader(text, priority) {
   }, 10000);
 }
 
-function botSelectCards() {
-  const cardContainer = document.getElementById("card-container");
-  if (!cardContainer || cardContainer.children.length === 0) {
-    console.log("No cards available for selection!");
-    return;
+class Bot {
+  constructor(botId) {
+    this.botId = botId;
   }
 
-  const allCards = Array.from(cardContainer.children);
-  const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
-  const shuffledCards = [...allCards].sort(() => Math.random() - 0.5);
-  const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
-
-  selectedCards.forEach((card) => {
-    card.selected = true;
-    card.setAttribute("title", "Selected");
-    card.style.backgroundColor = "#81ea74";
-  });
-
-  notifyScreenReader(`Bot selected ${selectedCards.length} cards`, "assertive");
-  document.getElementById("place-btn").click();
-
-  const bluffTexts = [
-    "A",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "10",
-    "J",
-    "Q",
-    "K",
-  ];
-  const bluffText = bluffTexts[Math.floor(Math.random() * bluffTexts.length)];
-
-  notifyScreenReader(`Bot entered ${bluffText} as Bluff Text`, "assertive");
-
-  window.prompt = function () {
-    return bluffText;
-  };
-  const event = new KeyboardEvent("keydown", {
-    key: "Enter",
-    code: "Enter",
-    keyCode: 13,
-  });
-  document.dispatchEvent(event);
-}
-
-const handleBotMove = () => {
-  const moves = ["place", "raise", "pass"];
-  const probabilities = [0.1, 0.4, 0.5];
-  let random = Math.random();
-  let cumulativeProbability = 0;
-  for (let i = 0; i < moves.length; i++) {
-    cumulativeProbability += probabilities[i];
-    if (random < cumulativeProbability) {
-      return moves[i];
+  selectCards() {
+    const cardContainer = document.getElementById("card-container");
+    if (!cardContainer || cardContainer.children.length === 0) {
+      console.log("No cards available for selection!");
+      return;
     }
-  }
-  return moves[moves.length - 1];
-};
 
-function handleBotTurn(botId) {
-  const botMove = handleBotMove();
-  notifyScreenReader(`Bot ${botId + 1} chooses to: ${botMove}`, "assertive");
-  return botMove;
+    const allCards = Array.from(cardContainer.children);
+    const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
+    const shuffledCards = [...allCards].sort(() => Math.random() - 0.5);
+    const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
+
+    selectedCards.forEach((card) => {
+      card.selected = true;
+      card.setAttribute("title", "Selected");
+      card.style.backgroundColor = "#81ea74";
+    });
+
+    notifyScreenReader(
+      `Bot selected ${selectedCards.length} cards`,
+      "assertive"
+    );
+    document.getElementById("place-btn").click();
+
+    this.enterBluffText();
+  }
+
+  enterBluffText() {
+    const bluffTexts = [
+      "A",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "J",
+      "Q",
+      "K",
+    ];
+    const bluffText = bluffTexts[Math.floor(Math.random() * bluffTexts.length)];
+
+    notifyScreenReader(`Bot entered ${bluffText} as Bluff Text`, "assertive");
+
+    window.prompt = function () {
+      return bluffText;
+    };
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      keyCode: 13,
+    });
+
+    document.dispatchEvent(event);
+  }
+  static getSecureRandom() {
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return array[0] / (0xffffffff + 1);
+  }
+
+  static decideMove() {
+    const moves = ["place", "raise", "pass"];
+
+    let botProbabilities = [];
+    for (let i = 0; i < 3; i++) {
+      botProbabilities.push(Bot.getSecureRandom());
+    }
+
+    const total = botProbabilities.reduce((acc, val) => acc + val, 0);
+    const probabilities = botProbabilities.map((val) => val / total);
+
+    let random = Bot.getSecureRandom();
+    let cumulativeProbability = 0;
+
+    for (let i = 0; i < moves.length; i++) {
+      cumulativeProbability += probabilities[i];
+      if (random < cumulativeProbability) {
+        return moves[i];
+      }
+    }
+    return moves[moves.length - 1];
+  }
+
+  handleTurn() {
+    const botMove = Bot.decideMove();
+    notifyScreenReader(
+      `Bot ${this.botId + 1} chooses to: ${botMove}`,
+      "assertive"
+    );
+    return botMove;
+  }
 }
 
 const playedContainer = document.getElementById("container_played");
@@ -238,7 +270,7 @@ socket.on("STOC-SET-NUMBER-OF-PLAYERS", (total) => {
   const playerContainer = document.getElementById("player-container");
   playerContainer.innerHTML = "";
   for (i = 0; i < numberOfPlayers; i++) {
-    playerContainer.innerHTML += `<div class="user p-1" tabindex="0"><i class="far fa-user"></i><span id="user${i}">user${
+    playerContainer.innerHTML += `<div class="user p-1" tabindex="0"><i class="far fa-user"></i><span id="user${i}">bot${
       i + 1
     }</span></div>`;
   }
@@ -372,7 +404,8 @@ socket.on("STOC-SET-WHOS-TURN", (value, value2) => {
   } else {
     placeBtn.disabled = false;
     passBtn.disabled = false;
-    const botTurn = handleBotTurn(whosTurn);
+    const bot = new Bot(whosTurn);
+    const botTurn = bot.handleTurn();
     if (botTurn === "raise") {
       window.setTimeout(function () {
         document.getElementById("raise-btn").click();
@@ -384,7 +417,7 @@ socket.on("STOC-SET-WHOS-TURN", (value, value2) => {
       }, 2000);
     } else if (botTurn === "place") {
       window.setTimeout(function () {
-        botSelectCards();
+        bot.selectCards();
       }, 2000);
     }
     messageWhosTurn = messageWhosTurn.concat(

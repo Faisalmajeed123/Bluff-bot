@@ -1,5 +1,4 @@
-// FOR MEDIUM & HARD MODE
-
+// MEDIUM & HARD MODE
 const botMoveHistories = {};
 const opponentMoveHistory = { bluff: { success: 0, fail: 0 } };
 let qWorkers = {};
