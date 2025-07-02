@@ -36,6 +36,7 @@ export class Card {
     this.value = value;
   } // this class represents single card with single value
 }
+
 function freshDeck() {
   return SUITS.flatMap((suit) => {
     return VALUES.map((value) => {

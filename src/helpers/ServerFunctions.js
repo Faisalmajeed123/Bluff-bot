@@ -3,6 +3,7 @@ export const partitionCards = (cardset, roomCapacity) => {
   const cardsPerPlayer = Math.floor(totalCards / roomCapacity);
   console.log("PERPLAYER", cardsPerPlayer);
   const partitionedCards = [];
+
   for (let i = 0; i < roomCapacity; i++) {
     const start = i * cardsPerPlayer;
     const end = (i + 1) * cardsPerPlayer;
@@ -14,15 +15,20 @@ export const partitionCards = (cardset, roomCapacity) => {
 // Function to distribute cards among players
 // partitionedCards = [0-13, 13-26, 26-39, 39-52]
 
-export const delayedCode = (cardset, roomCapacity, connectedClients) => {
-  // Code to be executed after 2 seconds
+export const delayedCode = (
+  cardset,
+  roomCapacity,
+  connectedClients,
+  rooms,
+  roomId
+) => {
   const partitionedCards = partitionCards(cardset, roomCapacity);
+  rooms[roomId].playerCards = {};
 
-  // Iterate over the client array and assign subpartitions to each client
   connectedClients.forEach((client, index) => {
-    const subpartition = partitionedCards[index]; // Get the corresponding subpartition
-    console.log("SUBPARTITION: ", subpartition);
-    // Emit the subpartition to the client
-    client.emit("STO1C-DRAW-CARDS", subpartition);
+    const playerCards = partitionedCards[index];
+    rooms[roomId].playerCards[client.id] = playerCards;
+
+    client.emit("STO1C-DRAW-CARDS", playerCards);
   });
 };

@@ -4,13 +4,15 @@ import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
 import hbs from "hbs";
-import * as serverfn from "./helpers/ServerFunctions.js";
-import * as Deck from "./helpers/deck.js";
+import * as serverfn from "./src/helpers/ServerFunctions.js";
+import * as Deck from "./src/helpers/deck.js";
 import { v4 as uuidv4 } from "uuid";
-// Setup __dirname in ES module
+
+// TODO: Add bot object and player object separate, by pushing different values in clients
+// refer to this chat (https://chatgpt.com/c/6863dc29-277c-800a-b5d4-7a42eef03b16)
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
@@ -18,16 +20,27 @@ const router = express.Router();
 const CardDeck = new Deck.Deck();
 const rooms = {};
 app.set("view engine", "hbs");
-app.set("views", path.join(__dirname, "views"));
+app.set("views", path.join(__dirname, "src", "views"));
+
+app.use(express.static(path.join(__dirname)));
+app.use("/js", express.static(path.join(__dirname, "src", "js", "scripts")));
+
 app.use(express.static("public"));
+app.use(express.static(__dirname));
+app.use("/js", express.static(path.join(__dirname, "src", "js")));
+
+// Views config
+app.set("view engine", "hbs");
+app.set("views", path.join(__dirname, "src", "views"));
 
 console.log("ROOMS", rooms);
 app.get("/", (req, res) => {
   res.render("game");
 });
-var rcount;
+let rcount;
 const roomCapacity = 2; //set roomcapacity
 const roomCounts = {};
+
 io.on("connection", (socket) => {
   console.log("New connection established. User connected with ID:", socket.id);
   // Find or create a room with available capacity
@@ -53,37 +66,55 @@ io.on("connection", (socket) => {
       wonUsers: [],
       // Add other room-specific variables as needed
       lastPlayedCardCount: undefined,
-      currentTurnIndex: 0, // Index of the current turn player(change this to shift first user turns)
+      currentTurnIndex: 1, // Index of the current turn player(change this to shift first user turns)
       playinguserfail: false,
       newGame: true,
       bluff_text: undefined,
       raiseActionDone: false,
       cardset: CardDeck.cards,
+      gameState: {
+        currentPlayerId: "", //Completed
+        players: [],
+        lastAction: {
+          type: "",
+          playerId: "",
+          bluffText: "",
+          wasSuccessful: null,
+        }, //Completed
+        discardPile: [], //Completed
+        currentRank: "", //Completed
+      },
     };
   }
-  // so first it will find available room if not then it will create new room in [] of rooms in which there
-  // will be objects of room id and each object will have these properties.
 
-  // Join the room
   socket.join(roomId);
   rooms[roomId].clients.push(socket);
-  roomCounts[roomId]++; // Increment the room count
+  roomCounts[roomId]++;
   console.log(
     "New user joined connected with room ID: " +
       roomId +
       ", member count: " +
       roomCounts[roomId]
   );
+
   // If the room reaches its capacity, emit a message to restrict further entry
   if (roomCounts[roomId] >= roomCapacity) {
     io.to(roomId).emit("STOC-SET-NUMBER-OF-PLAYERS", roomCapacity);
     assignTurns(roomId);
+
     setTimeout(() => {
       serverfn.delayedCode(
         rooms[roomId].cardset,
         roomCapacity,
-        rooms[roomId].clients
+        rooms[roomId].clients,
+        rooms,
+        roomId
       );
+
+      rooms[roomId].gameState.players = rooms[roomId].clients.map((client) => ({
+        id: client.id,
+        cardCount: rooms[roomId].playerCards[client.id]?.length || 0,
+      }));
     }, 4000);
     // Execute something else during the 2-second delay
     executeDuringDelay(roomId);
@@ -99,14 +130,37 @@ io.on("connection", (socket) => {
   socket.on("CTOS-PLACE-CARD", (selectedCards, bluff_text, remainingCards) => {
     lastPlayedCardCount = selectedCards.length;
     rooms[roomId].playinguserfail = false;
+
+    // Remove selected cards from player's hand
+    rooms[roomId].playerCards[socket.id] = rooms[roomId].playerCards[
+      socket.id
+    ].filter(
+      (card) =>
+        !selectedCards.some(
+          (sel) => sel.suit === card.suit && sel.value === card.value
+        )
+    );
+
+    // Update card counts
+    rooms[roomId].gameState.players = rooms[roomId].clients.map((client) => ({
+      id: client.id,
+      cardCount: rooms[roomId].playerCards[client.id]?.length || 0,
+    }));
+
     selectedCards.forEach((card) => {
       rooms[roomId].SuitStack.push(card.suit);
       rooms[roomId].CardStack.push(card.value);
+
+      rooms[roomId].gameState.discardPile.push({
+        suit: card.suit,
+        value: card.value,
+      });
     });
 
     console.log("value:", rooms[roomId].CardStack);
     console.log("suit:", rooms[roomId].SuitStack);
     console.log("remainingCards:", remainingCards);
+
     if (remainingCards == 0) {
       console.log(
         "Last played user is going to win! position : ",
@@ -116,16 +170,29 @@ io.on("connection", (socket) => {
     }
 
     rooms[roomId].raiseActionDone = false;
-    var clientPlaying = socket.id;
+    // var clientPlaying = socket.id;
     if (rooms[roomId].newGame === true) {
       rooms[roomId].newGame = false;
       rooms[roomId].bluff_text = bluff_text;
     }
-    console.log("input:", rooms[roomId].bluff_text);
+
+    if (bluff_text) {
+      rooms[roomId].bluff_text = bluff_text;
+      rooms[roomId].gameState.currentRank = bluff_text;
+
+      rooms[roomId].gameState.lastAction = {
+        type: "place",
+        playerId: socket.id,
+        bluffText: bluff_text || "",
+        wasSuccessful: null,
+      };
+    }
+
     io.to(roomId).emit(
       "STOC-GAME-PLAYED",
       lastPlayedCardCount,
-      rooms[roomId].bluff_text
+      rooms[roomId].bluff_text,
+      rooms[roomId].currentTurnIndex
     );
     io.to(roomId).emit("STOC-RAISE-TIME-START");
     setTimeout(() => {
@@ -137,6 +204,9 @@ io.on("connection", (socket) => {
       if (!rooms[roomId].raiseActionDone) {
         io.to(roomId).emit("STOC-RAISE-TIME-OVER");
         changeTurn(roomId, io);
+        // console.log("Passed players:", rooms[roomId].passedPlayers);
+        // console.log("Won users:", rooms[roomId].wonUsers);
+        // console.log("Current turn index:", rooms[roomId].currentTurnIndex);
       }
     }, 15000);
   });
@@ -146,6 +216,7 @@ io.on("connection", (socket) => {
     const poppedElements = [];
     const poppedSuits = [];
     rooms[roomId].playinguserfail = false;
+
     for (let i = 0; i < lastPlayedCardCount; i++) {
       if (rooms[roomId].CardStack.length > 0) {
         const poppedSuit = rooms[roomId].SuitStack.pop();
@@ -157,6 +228,20 @@ io.on("connection", (socket) => {
             rooms[roomId].bluff_text
           );
           rooms[roomId].playinguserfail = true;
+
+          const receiverSocket =
+            rooms[roomId].clients[rooms[roomId].currentTurnIndex];
+          rooms[roomId].playerCards[receiverSocket.id].push(
+            ...rooms[roomId].CardStack,
+            ...poppedElements
+          );
+          rooms[roomId].gameState.players = rooms[roomId].clients.map(
+            (client) => ({
+              id: client.id,
+              cardCount: rooms[roomId].playerCards[client.id]?.length || 0,
+            })
+          );
+
           console.log("playinguserfail:", rooms[roomId].playinguserfail);
         }
         poppedElements.push(poppedElement);
@@ -185,7 +270,8 @@ io.on("connection", (socket) => {
         poppedSuits
       );
       rooms[roomId].currentTurnIndex =
-        (raisedClientPos - 1) % rooms[roomId].clients.length;
+        (raisedClientPos - 1 + rooms[roomId].clients.length) %
+        rooms[roomId].clients.length;
     } else {
       io.to(roomId).emit(
         "STOC-SHOW-RAISED-CARDS",
@@ -211,9 +297,16 @@ io.on("connection", (socket) => {
         rooms[roomId].playerGoingToWin = -1;
       }
     }
+
+    rooms[roomId].gameState.lastAction = {
+      type: "raise",
+      playerId: socket.id,
+      bluffText: "",
+      wasSuccessful: !rooms[roomId].playinguserfail,
+    };
     rooms[roomId].CardStack = [];
     rooms[roomId].SuitStack = [];
-    console.log("THIS OVER");
+    rooms[roomId].gameState.discardPile = [];
     rooms[roomId].passedPlayers.length = 0;
     rooms[roomId].newGame = true;
 
@@ -234,12 +327,20 @@ io.on("connection", (socket) => {
       rooms[roomId].wonUsers.length
     );
     io.to(roomId).emit("STOC-GAME-PLAYED", 0, rooms[roomId].bluff_text);
+    rooms[roomId].gameState.lastAction = {
+      type: "pass",
+      playerId: socket.id,
+      bluffText: "",
+      wasSuccessful: null,
+    };
+
     if (
       rooms[roomId].passedPlayers.length ===
       rooms[roomId].clients.length - rooms[roomId].wonUsers.length
     ) {
       rooms[roomId].CardStack = [];
       rooms[roomId].SuitStack = [];
+      rooms[roomId].gameState.discardPile = [];
       io.to(roomId).emit("STOC-PLAY-OVER");
       rooms[roomId].passedPlayers.length = 0;
       rooms[roomId].newGame = true;
@@ -258,44 +359,100 @@ io.on("connection", (socket) => {
       " user disconnected with roomID:" + roomId + "member" + roomCounts[roomId]
     );
     rcount = roomCounts[roomId];
-    rcount--; // Decrement the room count
+    rcount--;
     console.log("the room count is:", rcount);
     if (roomCounts[roomId] <= 0) {
-      delete roomCounts[roomId]; // Remove the room if there are no more users
+      delete roomCounts[roomId];
+      delete rooms[roomId];
       console.log("room ented");
     }
   });
 });
 
+function playBotTurn(roomId) {
+  const room = rooms[roomId];
+  const botSocket = room.clients[room.currentTurnIndex];
+  const botId = botSocket.id;
+
+  const botHand = room.playerCards[botId];
+  const selectedCards = botHand.slice(0, 2);
+  const bluff_text = selectedCards[0]?.value || "7";
+
+  // Remove cards from bot hand
+  room.playerCards[botId] = botHand.filter(
+    (card) =>
+      !selectedCards.some(
+        (sel) => sel.suit === card.suit && sel.value === card.value
+      )
+  );
+
+  // Update gameState
+  room.gameState.players = room.clients.map((client) => ({
+    id: client.id,
+    cardCount: room.playerCards[client.id]?.length || 0,
+  }));
+
+  // Push to stacks
+  selectedCards.forEach((card) => {
+    room.SuitStack.push(card.suit);
+    room.CardStack.push(card.value);
+    room.gameState.discardPile.push(card);
+  });
+
+  room.bluff_text = bluff_text;
+  room.gameState.currentRank = bluff_text;
+  room.gameState.lastAction = {
+    type: "place",
+    playerId: botId,
+    bluffText: bluff_text,
+    wasSuccessful: null,
+  };
+
+  io.to(roomId).emit(
+    "STOC-GAME-PLAYED",
+    selectedCards.length,
+    bluff_text,
+    room.currentTurnIndex
+  );
+
+  // Proceed to raise time
+  io.to(roomId).emit("STOC-RAISE-TIME-START");
+
+  setTimeout(() => {
+    io.to(roomId).emit("STOC-RAISE-TIME-OVER");
+    changeTurn(roomId);
+  }, 5000);
+}
+
 function assignTurns(roomId) {
-  // Emit the turn order to each client
   rooms[roomId].clients.forEach((client, index) => {
-    client.emit("STO1C-SET-POSITION", index);
+    io.to(client.id).emit("STO1C-SET-POSITION", index);
   });
 }
-// Decide which player will have first move
 
 function changeTurn(roomId) {
-  rooms[roomId].currentTurnIndex =
-    (rooms[roomId].currentTurnIndex + 1) % rooms[roomId].clients.length;
-  console.log("passedPlayers : ", rooms[roomId].passedPlayers);
-  console.log("wonUsers : ", rooms[roomId].wonUsers);
-  if (rooms[roomId].wonUsers.length === rooms[roomId].clients.length - 1) {
-    console.log("Game Over");
-    io.to(roomId).emit("STOC-GAME-OVER", rooms[roomId].wonUsers);
+  const room = rooms[roomId];
+  room.currentTurnIndex = (room.currentTurnIndex + 1) % room.clients.length;
+
+  const nextSocket = room.clients[room.currentTurnIndex];
+  const nextId = nextSocket.id;
+  room.gameState.currentPlayerId = nextId;
+
+  console.log("Updated gameState for room:", roomId, room.gameState);
+
+  if (room.wonUsers.length === room.clients.length - 1) {
+    io.to(roomId).emit("STOC-GAME-OVER", room.wonUsers);
+    return;
+  }
+
+  if (nextSocket.isBot) {
+    setTimeout(() => playBotTurn(roomId), 1000);
   } else {
-    if (
-      rooms[roomId].passedPlayers.includes(rooms[roomId].currentTurnIndex) ||
-      rooms[roomId].wonUsers.includes(rooms[roomId].currentTurnIndex)
-    ) {
-      changeTurn(roomId);
-    } else {
-      io.to(roomId).emit(
-        "STOC-SET-WHOS-TURN",
-        rooms[roomId].currentTurnIndex,
-        rooms[roomId].newGame
-      );
-    }
+    io.to(roomId).emit(
+      "STOC-SET-WHOS-TURN",
+      room.currentTurnIndex,
+      room.newGame
+    );
   }
 }
 

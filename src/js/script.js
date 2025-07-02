@@ -1,25 +1,57 @@
 var pos;
 var whosTurn;
 var newGame;
+let raiseFlag = false;
+let cards;
+let numberOfPlayers;
+
+let nameOfBots = [
+  "Sebastian",
+  "Isabella",
+  "Alexander",
+  "Caldwell",
+  "Maximilian",
+  "Cassandra",
+  "Theodore",
+  "Penelope",
+  "Dominic",
+  "Hartley",
+];
+
+whosTurn = Array.from({ length: 2 }, (_, i) => i);
+
+const playerNames = [];
+const usedNames = [];
+
+function getUniqueBotName() {
+  const availableNames = nameOfBots.filter((name) => !usedNames.includes(name));
+  const randomIndex = Math.floor(Math.random() * availableNames.length);
+  const name = availableNames[randomIndex];
+  usedNames.push(name);
+  return name;
+}
+
+for (let i = 0; i < 2; i++) {
+  if (i === 1) {
+    playerNames.push("Me");
+  } else {
+    playerNames.push(getUniqueBotName());
+  }
+}
 
 var lastGameCardCount = 0;
 var lastGameBluffText = "Nothing";
-let lastNotification = "";
+console.log("LASTGAMEBLUFFTEXT1: ", lastGameBluffText);
 
-const botIds = [1];
 var socket = io();
-const audioFilesAddress = "http://" + location.host + "/";
+const audioFilesAddress = "http://" + location.host + "/src/assets/";
 
 var audioRaiseTime = new Audio(audioFilesAddress + "rise-time.mp3");
 var audioCardsShuffling = new Audio(audioFilesAddress + "cards-shuffling.mp3");
 var audioCardsPlaced = new Audio(audioFilesAddress + "cards-placed.mp3");
 var audioCardsRaised = new Audio(audioFilesAddress + "cards-raised.mp3");
 
-var listenNodeInserted = true;
-
 function notifyScreenReader(text, priority) {
-  if (text === lastNotification) return;
-  lastNotification = text;
   var el = document.createElement("div");
   var id = "speak-" + Date.now();
   el.setAttribute("id", id);
@@ -28,120 +60,118 @@ function notifyScreenReader(text, priority) {
 
   window.setTimeout(function () {
     document.getElementById(id).innerHTML = text;
-  }, 500);
-  lastNotification = "";
+  }, 2000);
 
   window.setTimeout(function () {
     document.body.removeChild(document.getElementById(id));
   }, 10000);
 }
 
-class Bot {
-  constructor(botId) {
-    this.botId = botId;
-  }
+// export function createBot(isRaiseTime = true) {
+//   console.log("====================1");
+//   const delay = isRaiseTime ? 17000 : 2000;
+//   function selectCards() {
+//     return new Promise((resolve) => {
+//       const cardContainer = document.getElementById("card-container");
+//       if (!cardContainer || cardContainer.children.length === 0) {
+//         resolve(null);
+//         return;
+//       }
 
-  selectCards() {
-    const cardContainer = document.getElementById("card-container");
-    if (!cardContainer || cardContainer.children.length === 0) {
-      console.log("No cards available for selection!");
-      return;
-    }
+//       const allCards = Array.from(cardContainer.children);
+//       const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
+//       const shuffledCards = allCards.sort(() => Math.random() - 0.5);
+//       const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
 
-    const allCards = Array.from(cardContainer.children);
-    const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
-    const shuffledCards = [...allCards].sort(() => Math.random() - 0.5);
-    const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
+//       setTimeout(() => {
+//         selectedCards.forEach((card) => {
+//           card.selected = true;
+//           card.setAttribute("title", "Selected");
+//           card.style.backgroundColor = "#81ea74";
+//         });
 
-    selectedCards.forEach((card) => {
-      card.selected = true;
-      card.setAttribute("title", "Selected");
-      card.style.backgroundColor = "#81ea74";
-    });
+//         const bluffTexts = [
+//           "A",
+//           "1",
+//           "2",
+//           "3",
+//           "4",
+//           "5",
+//           "6",
+//           "7",
+//           "8",
+//           "9",
+//           "10",
+//           "J",
+//           "Q",
+//           "K",
+//         ];
+//         const selectedRanks = selectedCards.map((card) =>
+//           card.textContent.trim().substring(1)
+//         );
 
-    notifyScreenReader(
-      `Bot selected ${selectedCards.length} cards`,
-      "assertive"
-    );
-    document.getElementById("place-btn").click();
+//         const tellTruth = Math.random() < 0.7;
+//         const bluffText =
+//           tellTruth && selectedRanks.length
+//             ? selectedRanks[0]
+//             : bluffTexts.filter((rank) => !selectedRanks.includes(rank))[
+//                 Math.floor(
+//                   Math.random() * (bluffTexts.length - selectedRanks.length)
+//                 )
+//               ];
 
-    this.enterBluffText();
-  }
+//         const realPrompt = window.prompt;
+//         window.prompt = () => bluffText;
+//         document.getElementById("place-btn").click();
+//         setTimeout(() => (window.prompt = realPrompt), 100);
 
-  enterBluffText() {
-    const bluffTexts = [
-      "A",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "J",
-      "Q",
-      "K",
-    ];
-    const bluffText = bluffTexts[Math.floor(Math.random() * bluffTexts.length)];
+//         const result = { length: selectedCards.length, bluffText };
+//         resolve(result);
+//       }, delay);
+//     });
+//   }
 
-    notifyScreenReader(`Bot entered ${bluffText} as Bluff Text`, "assertive");
+//   async function handleTurn() {
+//     console.log("====================2");
+//     // let move = decideMove();
+//     let result = null;
 
-    window.prompt = function () {
-      return bluffText;
-    };
+//     const cardContainer = document.getElementById("card-container");
+//     const isCardContainerEmpty =
+//       !cardContainer || cardContainer.children.length === 0;
 
-    const event = new KeyboardEvent("keydown", {
-      key: "Enter",
-      code: "Enter",
-      keyCode: 13,
-    });
+//     if (move === "raise" && isCardContainerEmpty) move = "pass";
 
-    document.dispatchEvent(event);
-  }
-  static getSecureRandom() {
-    const array = new Uint32Array(1);
-    window.crypto.getRandomValues(array);
-    return array[0] / (0xffffffff + 1);
-  }
+//     if (move === "raise") {
+//       await new Promise((resolve) => {
+//         setTimeout(() => {
+//           document.getElementById("raise-btn").click();
+//           setTimeout(() => {
+//             if (document.getElementById("raise-btn").disabled) {
+//               document.getElementById("pass-btn").click();
+//             }
+//             resolve(); // finish inner timeout
+//           }, 1000);
+//         }, 2000);
+//       });
+//     } else if (move === "place") {
+//       result = await selectCards(); // wait for async selectCards
+//     } else if (move === "pass") {
+//       await new Promise((resolve) => {
+//         setTimeout(() => {
+//           document.getElementById("pass-btn").click();
+//           resolve();
+//         }, delay);
+//       });
+//     }
 
-  static decideMove() {
-    const moves = ["place", "raise", "pass"];
+//     return { move, result };
+//   }
 
-    let botProbabilities = [];
-    for (let i = 0; i < 3; i++) {
-      botProbabilities.push(Bot.getSecureRandom());
-    }
-
-    const total = botProbabilities.reduce((acc, val) => acc + val, 0);
-    const probabilities = botProbabilities.map((val) => val / total);
-
-    let random = Bot.getSecureRandom();
-    let cumulativeProbability = 0;
-
-    for (let i = 0; i < moves.length; i++) {
-      cumulativeProbability += probabilities[i];
-      if (random < cumulativeProbability) {
-        return moves[i];
-      }
-    }
-    return moves[moves.length - 1];
-  }
-
-  handleTurn() {
-    const botMove = Bot.decideMove();
-    notifyScreenReader(
-      `Bot ${this.botId + 1} chooses to: ${botMove}`,
-      "assertive"
-    );
-    return botMove;
-  }
-}
+//   return { handleTurn };
+// }
 
 const playedContainer = document.getElementById("container_played");
-
 const observer = new MutationObserver((mutations, obs) => {
   mutations.forEach((mutation) => {
     mutation.addedNodes.forEach((node) => {
@@ -149,26 +179,36 @@ const observer = new MutationObserver((mutations, obs) => {
         node.setAttribute("processed", "true");
         const card_id = node.id;
         node.setAttribute("tabindex", "0");
-        node.addEventListener(
-          "keydown",
-          (event) => {
-            if (event.key === "Enter") {
-              const card = document.getElementById(card_id);
-              card.selected = true;
 
-              if (card.selected) {
-                notifyScreenReader(card_id + " Selected");
-                card.setAttribute("title", "Selected");
-                card.style.backgroundColor = "#81ea74";
-              } else {
-                notifyScreenReader(card_id + " Removed");
-                card.setAttribute("title", "Unselected");
-                card.style.backgroundColor = "#b963ee";
-              }
-            }
-          },
-          { once: true }
-        );
+        // Initialize selected flag
+        node.selected = false;
+
+        // Toggle logic shared between key and click
+        const toggleSelection = () => {
+          node.selected = !node.selected;
+
+          if (node.selected) {
+            notifyScreenReader(card_id + " Selected");
+            node.setAttribute("title", "Selected");
+            node.style.backgroundColor = "#81ea74";
+          } else {
+            notifyScreenReader(card_id + " Removed");
+            node.setAttribute("title", "Unselected");
+            node.style.backgroundColor = "#b963ee";
+          }
+        };
+
+        // ENTER key support
+        node.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            toggleSelection();
+          }
+        });
+
+        // CLICK support
+        node.addEventListener("click", () => {
+          toggleSelection();
+        });
       }
     });
   });
@@ -224,6 +264,7 @@ document.addEventListener("keydown", (event) => {
   else if (event.key.toLowerCase() === "z") {
     var turnMessage = "Current Player : " + (whosTurn + 1);
     if (pos == whosTurn) {
+      console.log("WOH TURN2: ", whosTurn);
       turnMessage = "Your turn!";
     }
     if (playedContainer.children.length == 0) {
@@ -265,24 +306,29 @@ document.addEventListener("keydown", (event) => {
   return true;
 });
 
-socket.on("STOC-SET-NUMBER-OF-PLAYERS", (total) => {
-  numberOfPlayers = total;
-  const playerContainer = document.getElementById("player-container");
-  playerContainer.innerHTML = "";
-  for (i = 0; i < numberOfPlayers; i++) {
-    playerContainer.innerHTML += `<div class="user p-1" tabindex="0"><i class="far fa-user"></i><span id="user${i}">bot${
-      i + 1
-    }</span></div>`;
+socket.on("STO1C-SET-POSITION", (index) => {
+  console.log("INDEX: ", index);
+  pos = index;
+  var player = document.getElementById(`user${pos}`);
+  if (player) {
+    player.innerHTML = "";
+    player.innerText = "Me";
+    console.log("playorder:", index);
+    notifyScreenReader("You are in position : " + (index + 1), "polite");
+  } else {
+    console.warn(`Element with ID user${pos} not found`);
   }
 });
 
-socket.on("STO1C-SET-POSITION", (index) => {
-  pos = index;
-  var player = document.getElementById(`user${pos}`);
-  player.innerHTML = "";
-  player.innerText = "You";
-  console.log("playorder:", index);
-  notifyScreenReader("You are in position : " + (index + 1), "polite");
+socket.on("STOC-SET-NUMBER-OF-PLAYERS", (total) => {
+  numberOfPlayers = total;
+  console.log("NUMBER OF PLAYERS: ", numberOfPlayers);
+  const playerContainer = document.getElementById("player-container");
+  playerContainer.innerHTML = "";
+  for (let i = 0; i < numberOfPlayers; i++) {
+    playerContainer.innerHTML += `<div class="user p-1" tabindex="0"><i class="far fa-user"></i><span id="user${i}">${playerNames[i]}</span></div>`;
+  }
+  console.log("🎮 Assigned Player Names:", playerNames);
 });
 
 function startShufflingEffect() {
@@ -346,12 +392,12 @@ function sort_cards(container_id) {
 }
 
 socket.on("STO1C-DRAW-CARDS", (subpartition) => {
-  console.log("received subpartition:", subpartition);
+  cards = subpartition;
+  const playerCards = subpartition;
   const cardContainer = document.getElementById("card-container");
   cardContainer.innerHTML = "";
-  // Loop through each card in the subpartition array
-  subpartition.forEach((card) => {
-    // Create a new card element
+
+  playerCards.forEach((card) => {
     const newCard = document.createElement("div");
     newCard.className = "col-4 col-sm-2 col-lg-1 offset-lg-0 cards ";
     newCard.id = card.suit + card.value;
@@ -364,70 +410,89 @@ socket.on("STO1C-DRAW-CARDS", (subpartition) => {
     newCard.style.textAlign = "center";
     newCard.textContent = card.suit + card.value;
 
-    // Append the card to the card container;
     cardContainer.appendChild(newCard);
+    // handleOnCards(card.suit, card.value);
   });
-  listenNodeInserted = false;
-  sort_cards("card-container");
-  listenNodeInserted = true;
 
   notifyScreenReader("Cards received!", "assertive");
 });
 
-socket.on("STOC-SET-WHOS-TURN", (value, value2) => {
+socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   whosTurn = value;
   newGame = value2;
+  console.log("WOH TURN3: ", whosTurn);
 
-  for (i = 0; i < numberOfPlayers; i++) {
-    var player = document.getElementById(`user${i}`);
-    if (i == whosTurn) {
-      player.style.backgroundColor = "#90EE90";
-    } else {
-      player.style.backgroundColor = "#FFCCCB";
-    }
+  for (let i = 0; i < numberOfPlayers; i++) {
+    const player = document.getElementById(`user${i}`);
+    player.style.backgroundColor = i === whosTurn ? "#90EE90" : "#FFCCCB";
   }
+
   const passBtn = document.getElementById("pass-btn");
   const placeBtn = document.getElementById("place-btn");
-  var messageWhosTurn = "";
-  if (newGame) {
-    messageWhosTurn = "New Round! ";
-  }
+  let messageWhosTurn = newGame ? "New Round! " : "";
+  console.log("POS: ", pos);
+
   if (whosTurn === pos) {
     console.log("your turn comes");
     placeBtn.disabled = false;
-    if (newGame) {
-      passBtn.disabled = true;
-    } else {
-      passBtn.disabled = false;
-    }
-    messageWhosTurn = messageWhosTurn.concat("It's your turn!");
-  } else {
+    passBtn.disabled = newGame;
+    messageWhosTurn += "It's your turn!";
+  } else if (whosTurn !== pos) {
     placeBtn.disabled = false;
     passBtn.disabled = false;
-    const bot = new Bot(whosTurn);
-    const botTurn = bot.handleTurn();
-    if (botTurn === "raise") {
-      window.setTimeout(function () {
-        document.getElementById("raise-btn").click();
-        document.getElementById("pass-btn").click();
-      }, 2000);
-    } else if (botTurn === "pass") {
-      window.setTimeout(function () {
-        document.getElementById("pass-btn").click();
-      }, 2000);
-    } else if (botTurn === "place") {
-      window.setTimeout(function () {
-        bot.selectCards();
-      }, 2000);
-    }
-    messageWhosTurn = messageWhosTurn.concat(
-      "It's " + (whosTurn + 1) + " turn!"
-    );
+    const cardContainer = document.getElementById("container_played");
+
+    // console.log("PLAYERSID: ", playerIds, whosTurn);
+    // console.log("ALL PLAYERS: ", allPlayers);
+    // console.log("LAST ACTION: ", lastAction);
+
+    // const gameState = {
+    //   currentPlayerId: playerIds[whosTurn],
+    //   players: allPlayers,
+    //   lastAction: lastGameAction,
+    //   discardPile: currentDiscardPile,
+    //   opponentCardsCount: playerCardCounts[pos],
+    //   currentRank: lastGameBluffText,
+    // };
+
+    // const bot = new BotPlayer(botId, botName, "beginner");
+    // bot.cards = botHand;
+
+    // const action = await bot.decideAction(gameState);
+
+    // if (action.type === "pass") {
+    //   document.getElementById("pass-btn").click();
+    // } else if (action.type === "raise") {
+    //   document.getElementById("raise-btn").click();
+    // } else if (action.type === "place") {
+    //   simulateCardSelection(action.cards); // Remove these cards from UI
+    //   simulatePrompt(action.bluffText);
+    //   document.getElementById("place-btn").click();
+    // }
+    // const stillEmpty = !cardContainer || cardContainer.children.length === 0;
+
+    // if (stillEmpty || !raiseFlag) {
+    //   const bot = createBot(false);
+    //   const botMove = await bot.handleTurn();
+    //   console.log("BOTMOVE: ", botMove);
+    // console.log(
+    //   "BOTMOVE SELECTED CARDS1: ",
+    //   botMove.stateSelectedCards.length
+    // );
+    // console.log(
+    //   "BOTMOVE SELECTED CARDS2: ",
+    //   botMove.stateSelectedCards.bluffText
+    // );
+    // trackOpponentMove(whosTurn, botMove.move);
+    // }
+
+    messageWhosTurn += `It's ${playerNames[whosTurn]} turn!`;
   }
+
   notifyScreenReader(messageWhosTurn, "assertive");
 });
 
-const placeCards = () => {
+function placeCards() {
   var cardContainer = document.getElementById("card-container");
   var numberOfCardsInDeck = cardContainer.children.length;
 
@@ -483,47 +548,53 @@ const placeCards = () => {
   document.getElementById("place-btn").disabled = true;
   document.getElementById("raise-btn").disabled = true;
   notifyScreenReader("Cards placed!", "assertive");
-};
+}
 
 socket.on("STOC-RAISE-TIME-START", () => {
   console.log("raise time starts");
-  if (pos != whosTurn) {
-    const raiseBtn = document.getElementById("raise-btn");
-    raiseBtn.disabled = true;
-  }
+  raiseFlag = true;
+
+  const raiseBtn = document.getElementById("raise-btn");
+  raiseBtn.disabled = pos === whosTurn;
   notifyScreenReader("Raise time starts!", "assertive");
+
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
   const raiseSpinner = document.createElement("div");
   raiseSpinner.classList.add("loader");
   areaRaiseSpinner.appendChild(raiseSpinner);
+
   audioRaiseTime.loop = true;
   audioRaiseTime.play();
+
+  // const bot = createBot(true);
+  // bot.handleTurn();
 });
 
 socket.on("STOC-RAISE-TIME-OVER", () => {
   console.log("raise time over");
+  raiseFlag = false;
   audioRaiseTime.pause();
   audioRaiseTime.currentTime = 0;
   const raiseBtn = document.getElementById("raise-btn");
-  raiseBtn.disabled = false;
+  raiseBtn.disabled = true;
   notifyScreenReader("Raise time over!", "assertive");
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
   areaRaiseSpinner.innerHTML = "";
 });
 
-socket.on("STOC-GAME-PLAYED", (cardCount, bluffText) => {
+socket.on("STOC-GAME-PLAYED", (cardCount, bluffText, playerIndex) => {
   lastGameCardCount = cardCount;
   lastGameBluffText = bluffText;
+  console.log("STOC-GAME-PLAYED:", cardCount, bluffText, playerIndex);
   audioCardsPlaced.play();
-  if (cardCount == 0) {
+
+  if (cardCount === 0) {
     notifyScreenReader("Passed!", "assertive");
     return;
   }
 
-  console.log("STOC-GAME-PLAYED:", cardCount, bluffText);
   const playingContainer = document.getElementById("container_played");
-  for (var i = 1; i <= cardCount; i++) {
-    // Create a new card element
+  for (let i = 1; i <= cardCount; i++) {
     const newCard = document.createElement("div");
     newCard.className = "col-4 col-sm-2 col-lg-1 offset-lg-0 cards ";
     newCard.id = bluffText;
@@ -533,11 +604,13 @@ socket.on("STOC-GAME-PLAYED", (cardCount, bluffText) => {
     newCard.style.fontSize = "xxx-large";
     newCard.style.textAlign = "center";
     newCard.textContent = bluffText + " ";
-    // Append the card to the card container;
     playingContainer.appendChild(newCard);
   }
+  const playedByName =
+    playerNames?.[playerIndex] || `Player ${playerIndex + 1}`;
+
   notifyScreenReader(
-    "Played. " + cardCount + " cards played as " + bluffText,
+    `${playedByName} played ${cardCount} cards as ${bluffText}`,
     "assertive"
   );
 });
@@ -555,7 +628,7 @@ socket.on(
     audioRaiseTime.pause();
     audioRaiseTime.currentTime = 0;
     audioCardsRaised.play();
-    console.log("openedcards:", poppedElements);
+    console.log("WINEER & LOSER:", winner, loser);
     // Get a reference to the OpenedCards div
     //var openedCardsDiv = document.querySelector('.OpenedCards');
     const playedContainer = document.getElementById("container_played");
@@ -577,14 +650,14 @@ socket.on(
       cardElement.style.textAlign = "center";
       playedContainer.appendChild(cardElement);
     });
-    var raisesCardsMessage =
-      "Raiced cards : " +
-      items +
-      " User " +
-      (winner + 1) +
-      " got the turn! User " +
-      (loser + 1) +
-      " got the penality!";
+    const winnerName = playerNames[winner] || `Player ${winner + 1}`;
+    const loserName = playerNames[loser] || `Player ${loser + 1}`;
+
+    const raisesCardsMessage =
+      `Raised cards: ${items}. ` +
+      `${winnerName} got the turn! ` +
+      `${loserName} got the penalty!`;
+
     notifyScreenReader(raisesCardsMessage, "assertive");
     const areaRaiseSpinner = document.getElementById("rise-spinner-area");
     areaRaiseSpinner.innerHTML = "";
@@ -672,7 +745,10 @@ socket.on("STOC-GAME-OVER", (wonUsers) => {
   console.log("THE WINNERS ARE:", wonUsers);
 });
 
+window.passaction = passaction;
+window.placeCards = placeCards;
+window.raisecards = raisecards;
+
 socket.on("disconnect", () => {
-  // Handle the disconnection
-  console.log("Disconnected from the server.");
+  console.log("User disconnected from room:");
 });
