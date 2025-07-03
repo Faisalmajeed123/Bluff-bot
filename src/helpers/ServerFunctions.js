@@ -12,9 +12,6 @@ export const partitionCards = (cardset, roomCapacity) => {
   return partitionedCards;
 };
 
-// Function to distribute cards among players
-// partitionedCards = [0-13, 13-26, 26-39, 39-52]
-
 export const delayedCode = (
   cardset,
   roomCapacity,
@@ -25,10 +22,12 @@ export const delayedCode = (
   const partitionedCards = partitionCards(cardset, roomCapacity);
   rooms[roomId].playerCards = {};
 
-  connectedClients.forEach((client, index) => {
+  connectedClients.slice(0, roomCapacity).forEach((client, index) => {
     const playerCards = partitionedCards[index];
     rooms[roomId].playerCards[client.id] = playerCards;
 
-    client.emit("STO1C-DRAW-CARDS", playerCards);
+    if (!client.isBot) {
+      client.socket.emit("STO1C-DRAW-CARDS", playerCards);
+    }
   });
 };

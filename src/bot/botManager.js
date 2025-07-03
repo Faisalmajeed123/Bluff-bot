@@ -52,7 +52,9 @@ export class BotManager {
     const bot = this.bots.find((b) => b.id === botId);
     if (!bot) return null;
 
-    return await bot.decideAction(this.gameState);
+    return await bot.decideAction(gameState).then((action) => {
+      console.log("🤖 Bot decision:", action);
+    });
   }
 
   /**

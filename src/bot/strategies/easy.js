@@ -16,7 +16,7 @@ export class BeginnerStrategy {
       (this.personality.challengeProbabilityModifier || 0);
 
     // If the challenge probability check passes, attempt to challenge
-    if (Math.random() < adjustedProbability) {
+    if (Math.random() < 0.2) {
       return true;
     }
 

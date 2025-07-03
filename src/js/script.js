@@ -1,7 +1,6 @@
 var pos;
 var whosTurn;
 var newGame;
-let raiseFlag = false;
 let cards;
 let numberOfPlayers;
 
@@ -66,110 +65,6 @@ function notifyScreenReader(text, priority) {
     document.body.removeChild(document.getElementById(id));
   }, 10000);
 }
-
-// export function createBot(isRaiseTime = true) {
-//   console.log("====================1");
-//   const delay = isRaiseTime ? 17000 : 2000;
-//   function selectCards() {
-//     return new Promise((resolve) => {
-//       const cardContainer = document.getElementById("card-container");
-//       if (!cardContainer || cardContainer.children.length === 0) {
-//         resolve(null);
-//         return;
-//       }
-
-//       const allCards = Array.from(cardContainer.children);
-//       const numberOfCardsToSelect = Math.floor(Math.random() * 3) + 1;
-//       const shuffledCards = allCards.sort(() => Math.random() - 0.5);
-//       const selectedCards = shuffledCards.slice(0, numberOfCardsToSelect);
-
-//       setTimeout(() => {
-//         selectedCards.forEach((card) => {
-//           card.selected = true;
-//           card.setAttribute("title", "Selected");
-//           card.style.backgroundColor = "#81ea74";
-//         });
-
-//         const bluffTexts = [
-//           "A",
-//           "1",
-//           "2",
-//           "3",
-//           "4",
-//           "5",
-//           "6",
-//           "7",
-//           "8",
-//           "9",
-//           "10",
-//           "J",
-//           "Q",
-//           "K",
-//         ];
-//         const selectedRanks = selectedCards.map((card) =>
-//           card.textContent.trim().substring(1)
-//         );
-
-//         const tellTruth = Math.random() < 0.7;
-//         const bluffText =
-//           tellTruth && selectedRanks.length
-//             ? selectedRanks[0]
-//             : bluffTexts.filter((rank) => !selectedRanks.includes(rank))[
-//                 Math.floor(
-//                   Math.random() * (bluffTexts.length - selectedRanks.length)
-//                 )
-//               ];
-
-//         const realPrompt = window.prompt;
-//         window.prompt = () => bluffText;
-//         document.getElementById("place-btn").click();
-//         setTimeout(() => (window.prompt = realPrompt), 100);
-
-//         const result = { length: selectedCards.length, bluffText };
-//         resolve(result);
-//       }, delay);
-//     });
-//   }
-
-//   async function handleTurn() {
-//     console.log("====================2");
-//     // let move = decideMove();
-//     let result = null;
-
-//     const cardContainer = document.getElementById("card-container");
-//     const isCardContainerEmpty =
-//       !cardContainer || cardContainer.children.length === 0;
-
-//     if (move === "raise" && isCardContainerEmpty) move = "pass";
-
-//     if (move === "raise") {
-//       await new Promise((resolve) => {
-//         setTimeout(() => {
-//           document.getElementById("raise-btn").click();
-//           setTimeout(() => {
-//             if (document.getElementById("raise-btn").disabled) {
-//               document.getElementById("pass-btn").click();
-//             }
-//             resolve(); // finish inner timeout
-//           }, 1000);
-//         }, 2000);
-//       });
-//     } else if (move === "place") {
-//       result = await selectCards(); // wait for async selectCards
-//     } else if (move === "pass") {
-//       await new Promise((resolve) => {
-//         setTimeout(() => {
-//           document.getElementById("pass-btn").click();
-//           resolve();
-//         }, delay);
-//       });
-//     }
-
-//     return { move, result };
-//   }
-
-//   return { handleTurn };
-// }
 
 const playedContainer = document.getElementById("container_played");
 const observer = new MutationObserver((mutations, obs) => {
@@ -440,52 +335,6 @@ socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   } else if (whosTurn !== pos) {
     placeBtn.disabled = false;
     passBtn.disabled = false;
-    const cardContainer = document.getElementById("container_played");
-
-    // console.log("PLAYERSID: ", playerIds, whosTurn);
-    // console.log("ALL PLAYERS: ", allPlayers);
-    // console.log("LAST ACTION: ", lastAction);
-
-    // const gameState = {
-    //   currentPlayerId: playerIds[whosTurn],
-    //   players: allPlayers,
-    //   lastAction: lastGameAction,
-    //   discardPile: currentDiscardPile,
-    //   opponentCardsCount: playerCardCounts[pos],
-    //   currentRank: lastGameBluffText,
-    // };
-
-    // const bot = new BotPlayer(botId, botName, "beginner");
-    // bot.cards = botHand;
-
-    // const action = await bot.decideAction(gameState);
-
-    // if (action.type === "pass") {
-    //   document.getElementById("pass-btn").click();
-    // } else if (action.type === "raise") {
-    //   document.getElementById("raise-btn").click();
-    // } else if (action.type === "place") {
-    //   simulateCardSelection(action.cards); // Remove these cards from UI
-    //   simulatePrompt(action.bluffText);
-    //   document.getElementById("place-btn").click();
-    // }
-    // const stillEmpty = !cardContainer || cardContainer.children.length === 0;
-
-    // if (stillEmpty || !raiseFlag) {
-    //   const bot = createBot(false);
-    //   const botMove = await bot.handleTurn();
-    //   console.log("BOTMOVE: ", botMove);
-    // console.log(
-    //   "BOTMOVE SELECTED CARDS1: ",
-    //   botMove.stateSelectedCards.length
-    // );
-    // console.log(
-    //   "BOTMOVE SELECTED CARDS2: ",
-    //   botMove.stateSelectedCards.bluffText
-    // );
-    // trackOpponentMove(whosTurn, botMove.move);
-    // }
-
     messageWhosTurn += `It's ${playerNames[whosTurn]} turn!`;
   }
 
@@ -552,10 +401,10 @@ function placeCards() {
 
 socket.on("STOC-RAISE-TIME-START", () => {
   console.log("raise time starts");
-  raiseFlag = true;
-
+  console.log("-----------------------------", pos, whosTurn);
   const raiseBtn = document.getElementById("raise-btn");
-  raiseBtn.disabled = pos === whosTurn;
+  // raiseBtn.disabled = pos !== whosTurn;
+  raiseBtn.disabled = false;
   notifyScreenReader("Raise time starts!", "assertive");
 
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
@@ -565,14 +414,10 @@ socket.on("STOC-RAISE-TIME-START", () => {
 
   audioRaiseTime.loop = true;
   audioRaiseTime.play();
-
-  // const bot = createBot(true);
-  // bot.handleTurn();
 });
 
 socket.on("STOC-RAISE-TIME-OVER", () => {
   console.log("raise time over");
-  raiseFlag = false;
   audioRaiseTime.pause();
   audioRaiseTime.currentTime = 0;
   const raiseBtn = document.getElementById("raise-btn");

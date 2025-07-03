@@ -188,7 +188,6 @@ export class BotPlayer {
       }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
     });
   }
-
   /**
    * Updates the bot's memory with the result of a challenge
    */

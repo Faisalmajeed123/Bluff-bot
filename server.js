@@ -3,10 +3,10 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
-import hbs from "hbs";
 import * as serverfn from "./src/helpers/ServerFunctions.js";
 import * as Deck from "./src/helpers/deck.js";
 import { v4 as uuidv4 } from "uuid";
+import { BotPlayer } from "./src/bot/bot.js";
 
 // TODO: Add bot object and player object separate, by pushing different values in clients
 // refer to this chat (https://chatgpt.com/c/6863dc29-277c-800a-b5d4-7a42eef03b16)
@@ -72,24 +72,47 @@ io.on("connection", (socket) => {
       bluff_text: undefined,
       raiseActionDone: false,
       cardset: CardDeck.cards,
+      playerCards: {},
       gameState: {
-        currentPlayerId: "", //Completed
+        currentPlayerId: "",
         players: [],
         lastAction: {
           type: "",
           playerId: "",
           bluffText: "",
           wasSuccessful: null,
-        }, //Completed
-        discardPile: [], //Completed
-        currentRank: "", //Completed
+        },
+        discardPile: [],
+        currentRank: "",
       },
     };
+
+    // Bot players
+    const bot = new BotPlayer(`bot-${uuidv4()}`, "Easy Bot", "beginner");
+    rooms[roomId].clients.push({
+      id: bot.id,
+      isBot: true,
+      botInstance: bot,
+    });
+    rooms[roomId].playerCards[bot.id] = [];
+    roomCounts[roomId]++;
+    console.log("==============================================", bot);
   }
 
   socket.join(roomId);
-  rooms[roomId].clients.push(socket);
-  roomCounts[roomId]++;
+
+  // make sure we only add the human ONCE
+  const humanExists = rooms[roomId].clients.some((c) => c.id === socket.id);
+  if (!humanExists) {
+    rooms[roomId].clients.push({
+      id: socket.id,
+      socket: socket,
+      isBot: false,
+    });
+    rooms[roomId].playerCards[socket.id] = [];
+    roomCounts[roomId]++;
+  }
+  // rooms[roomId].clients.push(socket);
   console.log(
     "New user joined connected with room ID: " +
       roomId +
@@ -157,10 +180,6 @@ io.on("connection", (socket) => {
       });
     });
 
-    console.log("value:", rooms[roomId].CardStack);
-    console.log("suit:", rooms[roomId].SuitStack);
-    console.log("remainingCards:", remainingCards);
-
     if (remainingCards == 0) {
       console.log(
         "Last played user is going to win! position : ",
@@ -172,9 +191,30 @@ io.on("connection", (socket) => {
     rooms[roomId].raiseActionDone = false;
     // var clientPlaying = socket.id;
     if (rooms[roomId].newGame === true) {
-      rooms[roomId].newGame = false;
+      // first move of the round, set bluff text
       rooms[roomId].bluff_text = bluff_text;
+      rooms[roomId].gameState.currentRank = bluff_text;
+      rooms[roomId].newGame = false;
+      rooms[roomId].gameState.lastAction = {
+        type: "place",
+        playerId: socket.id,
+        bluffText: bluff_text || "",
+        wasSuccessful: null,
+      };
+    } else {
+      // not a new round — keep existing bluff text
+      rooms[roomId].gameState.lastAction = {
+        type: "place",
+        playerId: socket.id,
+        bluffText: rooms[roomId].bluff_text,
+        wasSuccessful: null,
+      };
     }
+
+    // if (rooms[roomId].newGame === true) {
+    //   rooms[roomId].newGame = false;
+    //   rooms[roomId].bluff_text = bluff_text;
+    // }
 
     if (bluff_text) {
       rooms[roomId].bluff_text = bluff_text;
@@ -369,59 +409,85 @@ io.on("connection", (socket) => {
   });
 });
 
-function playBotTurn(roomId) {
+async function playBotTurn(roomId) {
   const room = rooms[roomId];
   const botSocket = room.clients[room.currentTurnIndex];
+  const bot = botSocket.botInstance;
   const botId = botSocket.id;
 
-  const botHand = room.playerCards[botId];
-  const selectedCards = botHand.slice(0, 2);
-  const bluff_text = selectedCards[0]?.value || "7";
-
-  // Remove cards from bot hand
-  room.playerCards[botId] = botHand.filter(
-    (card) =>
-      !selectedCards.some(
-        (sel) => sel.suit === card.suit && sel.value === card.value
-      )
-  );
-
-  // Update gameState
+  // fill up gameState with latest info
   room.gameState.players = room.clients.map((client) => ({
     id: client.id,
     cardCount: room.playerCards[client.id]?.length || 0,
   }));
+  room.gameState.currentPlayerId = botId;
 
-  // Push to stacks
-  selectedCards.forEach((card) => {
-    room.SuitStack.push(card.suit);
-    room.CardStack.push(card.value);
-    room.gameState.discardPile.push(card);
-  });
+  const gameState = room.gameState;
 
-  room.bluff_text = bluff_text;
-  room.gameState.currentRank = bluff_text;
-  room.gameState.lastAction = {
-    type: "place",
-    playerId: botId,
-    bluffText: bluff_text,
-    wasSuccessful: null,
-  };
+  try {
+    const action = await bot.decideAction(gameState);
 
-  io.to(roomId).emit(
-    "STOC-GAME-PLAYED",
-    selectedCards.length,
-    bluff_text,
-    room.currentTurnIndex
-  );
+    console.log(`🤖 Bot ${botId} decided:`, action);
 
-  // Proceed to raise time
-  io.to(roomId).emit("STOC-RAISE-TIME-START");
+    if (action.type === "place") {
+      // Remove selected cards from bot’s hand
+      room.playerCards[botId] = room.playerCards[botId].filter(
+        (card) =>
+          !action.cards.some(
+            (sel) => sel.suit === card.suit && sel.value === card.value
+          )
+      );
 
-  setTimeout(() => {
-    io.to(roomId).emit("STOC-RAISE-TIME-OVER");
+      // Update stacks
+      action.cards.forEach((card) => {
+        room.SuitStack.push(card.suit);
+        room.CardStack.push(card.value);
+        room.gameState.discardPile.push(card);
+      });
+
+      room.bluff_text = action.bluffText;
+      room.newGame = false;
+
+      room.gameState.lastAction = {
+        type: "place",
+        playerId: botId,
+        bluffText: action.bluffText,
+        wasSuccessful: null,
+      };
+
+      io.to(roomId).emit(
+        "STOC-GAME-PLAYED",
+        action.cards.length,
+        room.bluff_text,
+        room.currentTurnIndex
+      );
+      io.to(roomId).emit("STOC-RAISE-TIME-START");
+
+      setTimeout(() => {
+        io.to(roomId).emit("STOC-RAISE-TIME-OVER");
+        changeTurn(roomId);
+      }, 9000);
+    } else if (action.type === "pass") {
+      rooms[roomId].passedPlayers.push(room.currentTurnIndex);
+
+      io.to(roomId).emit("STOC-GAME-PLAYED", 0, room.bluff_text);
+      room.gameState.lastAction = {
+        type: "pass",
+        playerId: botId,
+        bluffText: "",
+        wasSuccessful: null,
+      };
+
+      changeTurn(roomId);
+    } else if (action.type === "raise") {
+      // (optional) implement raise action for bot
+      console.log(`Bot ${botId} wants to raise — implement logic.`);
+      changeTurn(roomId);
+    }
+  } catch (err) {
+    console.error(`Error in bot turn:`, err);
     changeTurn(roomId);
-  }, 5000);
+  }
 }
 
 function assignTurns(roomId) {
