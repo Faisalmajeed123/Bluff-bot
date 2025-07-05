@@ -4,6 +4,7 @@ export class BeginnerStrategy {
   }
 
   decideChallenge(gameState, botCards) {
+    console.log("00000000000000000000000000000000000000000000");
     const lastAction = gameState.lastAction;
     console.log("LAST ACTION: ", lastAction);
     if (!lastAction || lastAction.type !== "place") return false;

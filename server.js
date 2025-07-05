@@ -88,7 +88,7 @@ io.on("connection", (socket) => {
     };
 
     // Bot players
-    const bot = new BotPlayer(`bot-${uuidv4()}`, "Easy Bot", "beginner");
+    const bot = new BotPlayer(`bot-${uuidv4()}`, "Easy Bot", "intermediate");
     rooms[roomId].clients.push({
       id: bot.id,
       isBot: true,
@@ -199,6 +199,7 @@ io.on("connection", (socket) => {
         type: "place",
         playerId: socket.id,
         bluffText: bluff_text || "",
+        cards: selectedCards,
         wasSuccessful: null,
       };
     } else {
@@ -207,6 +208,7 @@ io.on("connection", (socket) => {
         type: "place",
         playerId: socket.id,
         bluffText: rooms[roomId].bluff_text,
+        cards: selectedCards,
         wasSuccessful: null,
       };
     }
@@ -225,6 +227,7 @@ io.on("connection", (socket) => {
         playerId: socket.id,
         bluffText: bluff_text || "",
         wasSuccessful: null,
+        cards: selectedCards,
       };
     }
 
@@ -430,7 +433,6 @@ async function playBotTurn(roomId) {
     console.log(`🤖 Bot ${botId} decided:`, action);
 
     if (action.type === "place") {
-      // Remove selected cards from bot’s hand
       room.playerCards[botId] = room.playerCards[botId].filter(
         (card) =>
           !action.cards.some(
@@ -452,6 +454,7 @@ async function playBotTurn(roomId) {
         type: "place",
         playerId: botId,
         bluffText: action.bluffText,
+        cards: selectedCards,
         wasSuccessful: null,
       };
 
@@ -480,14 +483,151 @@ async function playBotTurn(roomId) {
 
       changeTurn(roomId);
     } else if (action.type === "raise") {
-      // (optional) implement raise action for bot
-      console.log(`Bot ${botId} wants to raise — implement logic.`);
-      changeTurn(roomId);
+      console.log(`Bot ${botId} wants to raise!`);
+
+      const lastPlayerIndex = room.clients.findIndex(
+        (c) => c.id === gameState.lastAction.playerId
+      );
+
+      if (lastPlayerIndex !== -1) {
+        handleRaise(roomId, lastPlayerIndex);
+      } else {
+        console.error("Could not find player to raise against.");
+        changeTurn(roomId);
+      }
     }
   } catch (err) {
     console.error(`Error in bot turn:`, err);
     changeTurn(roomId);
   }
+}
+
+function handleRaise(roomId, raisedClientPos) {
+  const room = rooms[roomId];
+  room.raiseActionDone = true;
+  const poppedElements = [];
+  const poppedSuits = [];
+  room.playinguserfail = false;
+
+  const lastPlayedCardCount = room.CardStack.length;
+
+  for (let i = 0; i < lastPlayedCardCount; i++) {
+    if (room.CardStack.length > 0) {
+      const poppedSuit = room.SuitStack.pop();
+      const poppedElement = room.CardStack.pop();
+
+      if (poppedElement != room.bluff_text) {
+        room.playinguserfail = true;
+
+        const receiverSocket = room.clients[room.currentTurnIndex];
+        room.playerCards[receiverSocket.id].push(
+          ...room.CardStack,
+          ...poppedElements
+        );
+
+        room.gameState.players = room.clients.map((client) => ({
+          id: client.id,
+          cardCount: room.playerCards[client.id]?.length || 0,
+        }));
+      }
+
+      poppedElements.push(poppedElement);
+      poppedSuits.push(poppedSuit);
+    } else {
+      break;
+    }
+  }
+
+  if (room.playinguserfail) {
+    room.playerGoingToWin = -1;
+    io.to(roomId).emit(
+      "STOC-SHOW-RAISED-CARDS",
+      poppedElements,
+      poppedSuits,
+      raisedClientPos,
+      room.currentTurnIndex
+    );
+
+    const receiverSocket = room.clients[room.currentTurnIndex];
+    if (receiverSocket.isBot) {
+      // bots don’t have .socket
+      io.to(receiverSocket.id).emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        room.CardStack,
+        poppedElements,
+        room.SuitStack,
+        poppedSuits
+      );
+    } else {
+      receiverSocket.socket.emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        room.CardStack,
+        poppedElements,
+        room.SuitStack,
+        poppedSuits
+      );
+    }
+
+    room.currentTurnIndex =
+      (raisedClientPos - 1 + room.clients.length) % room.clients.length;
+  } else {
+    io.to(roomId).emit(
+      "STOC-SHOW-RAISED-CARDS",
+      poppedElements,
+      poppedSuits,
+      room.currentTurnIndex,
+      raisedClientPos
+    );
+
+    room.currentTurnIndex =
+      (room.currentTurnIndex - 1 + room.clients.length) % room.clients.length;
+
+    const openedClient = room.clients[raisedClientPos];
+    if (openedClient.isBot) {
+      io.to(openedClient.id).emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        room.CardStack,
+        poppedElements,
+        room.SuitStack,
+        poppedSuits
+      );
+    } else {
+      openedClient.socket.emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        room.CardStack,
+        poppedElements,
+        room.SuitStack,
+        poppedSuits
+      );
+    }
+
+    if (room.playerGoingToWin != -1) {
+      room.wonUsers.push(room.playerGoingToWin);
+      io.to(roomId).emit("STOC-PLAYER-WON", room.playerGoingToWin);
+      room.playerGoingToWin = -1;
+    }
+  }
+
+  room.gameState.lastAction = {
+    type: "raise",
+    playerId: room.clients[raisedClientPos].id,
+    bluffText: "",
+    wasSuccessful: !room.playinguserfail,
+  };
+
+  room.CardStack = [];
+  room.SuitStack = [];
+  room.gameState.discardPile = [];
+  room.passedPlayers.length = 0;
+  room.newGame = true;
+
+  setTimeout(() => {
+    io.to(roomId).emit("STOC-PLAY-OVER");
+  }, 3000);
+
+  setTimeout(() => {
+    changeTurn(roomId);
+  }, 5000);
 }
 
 function assignTurns(roomId) {

@@ -26,7 +26,9 @@ export const delayedCode = (
     const playerCards = partitionedCards[index];
     rooms[roomId].playerCards[client.id] = playerCards;
 
-    if (!client.isBot) {
+    if (client.isBot) {
+      client.botInstance.cards = playerCards;
+    } else {
       client.socket.emit("STO1C-DRAW-CARDS", playerCards);
     }
   });

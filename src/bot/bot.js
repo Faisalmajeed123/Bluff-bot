@@ -2,8 +2,8 @@
 import { MemorySystem } from "./memories.js";
 import { getPersonalityForDifficulty, Personalities } from "./personalities.js";
 import { BeginnerStrategy } from "./strategies/easy.js";
-// import { IntermediateStrategy } from "./strategies/intermediate-strategy.js";
-// import { AdvancedStrategy } from "./strategies/advanced-strategy.js";
+import { IntermediateStrategy } from "./strategies/medium.js";
+import { AdvancedStrategy } from "./strategies/hard.js";
 
 export class BotPlayer {
   constructor(id, name, difficultyLevel) {
@@ -80,6 +80,11 @@ export class BotPlayer {
             this.cards,
             this.memory
           );
+
+          console.log(
+            "------------------------------------------",
+            shouldChallenge
+          );
           if (shouldChallenge) {
             // Avoid too many consecutive challenges
             if (this.consecutiveActions.type === "raise") {
@@ -107,6 +112,7 @@ export class BotPlayer {
           return resolve({ type: "pass", playerId: this.id });
         }
 
+        console.log("--------------------------", this.cards.length);
         // If it's the bot's turn, decide whether to place cards or pass
         if (this.cards.length === 0) {
           return resolve({ type: "pass", playerId: this.id });
@@ -144,9 +150,13 @@ export class BotPlayer {
           (c) => c.value === declaredValue
         ).length;
 
+        console.log("Bot hasDeclaredCard:", hasDeclaredCard);
+        console.log("alreadyPlayedCount:", alreadyPlayedCount);
+
         // Only 4 cards per rank exist
         const maxRankCount = 4;
         const declaredIsLikelyGone = alreadyPlayedCount >= 3;
+        console.log("declaredIsLikelyGone:", declaredIsLikelyGone);
 
         // Force pass if no matching card AND most of them already played
         if (!hasDeclaredCard && declaredIsLikelyGone) {
@@ -160,6 +170,8 @@ export class BotPlayer {
         const shouldPass =
           Math.random() <
           Math.max(0.05, Math.min(0.5, adjustedPassProbability));
+        console.log("adjustedPassProbability:", adjustedPassProbability);
+        console.log("Random chance decided shouldPass:", shouldPass);
 
         if (shouldPass) {
           this.consecutiveActions = { type: "pass", count: 1 };
