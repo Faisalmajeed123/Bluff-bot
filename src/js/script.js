@@ -3,6 +3,9 @@ var whosTurn;
 var newGame;
 let cards;
 let numberOfPlayers;
+let containerCount = 0;
+let listenNodeInserted = false;
+let childrensArray = [];
 
 let nameOfBots = [
   "Sebastian",
@@ -40,8 +43,6 @@ for (let i = 0; i < 2; i++) {
 
 var lastGameCardCount = 0;
 var lastGameBluffText = "Nothing";
-console.log("LASTGAMEBLUFFTEXT1: ", lastGameBluffText);
-
 var socket = io();
 const audioFilesAddress = "http://" + location.host + "/src/assets/";
 
@@ -159,7 +160,6 @@ document.addEventListener("keydown", (event) => {
   else if (event.key.toLowerCase() === "z") {
     var turnMessage = "Current Player : " + (whosTurn + 1);
     if (pos == whosTurn) {
-      console.log("WOH TURN2: ", whosTurn);
       turnMessage = "Your turn!";
     }
     if (playedContainer.children.length == 0) {
@@ -202,13 +202,11 @@ document.addEventListener("keydown", (event) => {
 });
 
 socket.on("STO1C-SET-POSITION", (index) => {
-  console.log("INDEX: ", index);
   pos = index;
   var player = document.getElementById(`user${pos}`);
   if (player) {
     player.innerHTML = "";
     player.innerText = "Me";
-    console.log("playorder:", index);
     notifyScreenReader("You are in position : " + (index + 1), "polite");
   } else {
     console.warn(`Element with ID user${pos} not found`);
@@ -217,13 +215,11 @@ socket.on("STO1C-SET-POSITION", (index) => {
 
 socket.on("STOC-SET-NUMBER-OF-PLAYERS", (total) => {
   numberOfPlayers = total;
-  console.log("NUMBER OF PLAYERS: ", numberOfPlayers);
   const playerContainer = document.getElementById("player-container");
   playerContainer.innerHTML = "";
   for (let i = 0; i < numberOfPlayers; i++) {
     playerContainer.innerHTML += `<div class="user p-1" tabindex="0"><i class="far fa-user"></i><span id="user${i}">${playerNames[i]}</span></div>`;
   }
-  console.log("🎮 Assigned Player Names:", playerNames);
 });
 
 function startShufflingEffect() {
@@ -250,7 +246,6 @@ function startShufflingEffect() {
 }
 
 socket.on("STOC-SHUFFLING", (data) => {
-  console.log("DATA", data);
   notifyScreenReader("Card is shuffling!");
   startShufflingEffect();
 });
@@ -265,8 +260,6 @@ function get_value(item) {
 
 function sort_cards(container_id) {
   var childrens = document.getElementById(container_id).children;
-  console.log("Sorting cards in " + container_id);
-
   childrensArray = Array.prototype.slice.call(childrens, 0);
 
   childrensArray.sort(function (a, b) {
@@ -315,7 +308,6 @@ socket.on("STO1C-DRAW-CARDS", (subpartition) => {
 socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   whosTurn = value;
   newGame = value2;
-  console.log("WOH TURN3: ", whosTurn);
 
   for (let i = 0; i < numberOfPlayers; i++) {
     const player = document.getElementById(`user${i}`);
@@ -325,16 +317,14 @@ socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   const passBtn = document.getElementById("pass-btn");
   const placeBtn = document.getElementById("place-btn");
   let messageWhosTurn = newGame ? "New Round! " : "";
-  console.log("POS: ", pos);
 
   if (whosTurn === pos) {
-    console.log("your turn comes");
-    placeBtn.disabled = false;
-    passBtn.disabled = newGame;
-    messageWhosTurn += "It's your turn!";
-  } else if (whosTurn !== pos) {
     placeBtn.disabled = false;
     passBtn.disabled = false;
+    messageWhosTurn += "It's your turn!";
+  } else if (whosTurn !== pos) {
+    placeBtn.disabled = true;
+    passBtn.disabled = true;
     messageWhosTurn += `It's ${playerNames[whosTurn]} turn!`;
   }
 
@@ -400,11 +390,19 @@ function placeCards() {
 }
 
 socket.on("STOC-RAISE-TIME-START", () => {
-  console.log("raise time starts");
-  console.log("-----------------------------", pos, whosTurn);
   const raiseBtn = document.getElementById("raise-btn");
-  // raiseBtn.disabled = pos !== whosTurn;
-  raiseBtn.disabled = false;
+  const passBtn = document.getElementById("pass-btn");
+
+  // If bot placed cards → raise enabled, pass disabled
+  // If human placed cards → both disabled
+  if (whosTurn !== pos) {
+    raiseBtn.disabled = false;
+    passBtn.disabled = true;
+  } else {
+    raiseBtn.disabled = true;
+    passBtn.disabled = true;
+  }
+
   notifyScreenReader("Raise time starts!", "assertive");
 
   const areaRaiseSpinner = document.getElementById("rise-spinner-area");
@@ -417,7 +415,6 @@ socket.on("STOC-RAISE-TIME-START", () => {
 });
 
 socket.on("STOC-RAISE-TIME-OVER", () => {
-  console.log("raise time over");
   audioRaiseTime.pause();
   audioRaiseTime.currentTime = 0;
   const raiseBtn = document.getElementById("raise-btn");
@@ -430,7 +427,6 @@ socket.on("STOC-RAISE-TIME-OVER", () => {
 socket.on("STOC-GAME-PLAYED", (cardCount, bluffText, playerIndex) => {
   lastGameCardCount = cardCount;
   lastGameBluffText = bluffText;
-  console.log("STOC-GAME-PLAYED:", cardCount, bluffText, playerIndex);
   audioCardsPlaced.play();
 
   if (cardCount === 0) {
@@ -461,7 +457,6 @@ socket.on("STOC-GAME-PLAYED", (cardCount, bluffText, playerIndex) => {
 });
 
 function raisecards() {
-  console.log("Raise");
   socket.emit("CTOS-RAISE", pos);
   const raiseBtn = document.getElementById("raise-btn");
   raiseBtn.disabled = true;
@@ -473,28 +468,29 @@ socket.on(
     audioRaiseTime.pause();
     audioRaiseTime.currentTime = 0;
     audioCardsRaised.play();
-    console.log("WINEER & LOSER:", winner, loser);
-    // Get a reference to the OpenedCards div
-    //var openedCardsDiv = document.querySelector('.OpenedCards');
     const playedContainer = document.getElementById("container_played");
-    poppedElements.forEach((element, index) => {
-      playedContainer.removeChild(playedContainer.lastChild);
-    });
+
+    // 🔷 clear it safely
+    playedContainer.innerHTML = "";
+
     // Create a new element for each popped element
-    var items = "";
+    let items = "";
     poppedElements.forEach((element, index) => {
-      var cardElement = document.createElement("div");
+      const cardElement = document.createElement("div");
       cardElement.className = "col-4 col-sm-2 col-lg-1 offset-lg-0 cards ";
       cardElement.textContent = poppedSuits[index] + element;
-      items = items + " " + poppedSuits[index] + element;
+      items += " " + poppedSuits[index] + element;
+
       cardElement.setAttribute("tabindex", "1");
       cardElement.setAttribute("role", "button");
       cardElement.setAttribute("title", "on raised");
       cardElement.style.backgroundColor = "#ff0000";
       cardElement.style.fontSize = "xxx-large";
       cardElement.style.textAlign = "center";
+
       playedContainer.appendChild(cardElement);
     });
+
     const winnerName = playerNames[winner] || `Player ${winner + 1}`;
     const loserName = playerNames[loser] || `Player ${loser + 1}`;
 
@@ -504,6 +500,7 @@ socket.on(
       `${loserName} got the penalty!`;
 
     notifyScreenReader(raisesCardsMessage, "assertive");
+
     const areaRaiseSpinner = document.getElementById("rise-spinner-area");
     areaRaiseSpinner.innerHTML = "";
   }
@@ -525,8 +522,6 @@ socket.on(
     }
 
     var items = "";
-    console.log("cards for faileduser:", cardsGivingBack);
-    console.log("suits for faileduser:", suitsBack);
     const cardContainer = document.getElementById("card-container");
     cardsGivingBack.forEach((cardvalue, index) => {
       const newCard = document.createElement("div");
@@ -545,10 +540,6 @@ socket.on(
       // Append the card to the card container;
       cardContainer.appendChild(newCard);
     });
-    console.log(
-      "Number of cards in the container:",
-      cardContainer.childElementCount
-    );
     containerCount = cardContainer.childElementCount;
     listenNodeInserted = false;
     sort_cards("card-container");
@@ -564,14 +555,12 @@ function passaction() {
 }
 
 socket.on("STOC-PLAY-OVER", () => {
-  console.log("this play over .");
   const playedContainer = document.getElementById("container_played");
   playedContainer.innerHTML = "";
   notifyScreenReader("Current Round Over");
 });
 
 socket.on("STOC-PLAYER-WON", (player_position) => {
-  console.log("Player winned ", player_position);
   var player = document.getElementById(`user${player_position}`);
   player.parentElement.style.backgroundColor = "#97FF00";
   if (pos === player_position) {
@@ -587,7 +576,6 @@ socket.on("STOC-GAME-OVER", (wonUsers) => {
     gameOverMessage = gameOverMessage.concat("User " + (winner + 1) + ", ");
   });
   alert(gameOverMessage);
-  console.log("THE WINNERS ARE:", wonUsers);
 });
 
 window.passaction = passaction;

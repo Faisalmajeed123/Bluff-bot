@@ -4,9 +4,7 @@ export class BeginnerStrategy {
   }
 
   decideChallenge(gameState, botCards) {
-    console.log("00000000000000000000000000000000000000000000");
     const lastAction = gameState.lastAction;
-    console.log("LAST ACTION: ", lastAction);
     if (!lastAction || lastAction.type !== "place") return false;
 
     // In beginner mode, the bot only rarely attempts to guess (challenge) the bluff
@@ -33,8 +31,6 @@ export class BeginnerStrategy {
       }
       groups[card.value].push(card);
     }
-
-    console.log("GROUP: ", groups);
     return groups;
   }
 
@@ -67,12 +63,10 @@ export class BeginnerStrategy {
         farthestCard = card;
       }
     }
-    console.log("FARTHEST CARD: ", farthestCard);
     return farthestCard;
   }
 
   selectCardsAndBluff(gameState, botCards) {
-    console.log("GAME STATE: ", gameState);
     const lastPlayedValue = gameState.lastAction?.bluffText || null;
 
     // Group cards by value
@@ -87,8 +81,6 @@ export class BeginnerStrategy {
           1 + Math.floor(Math.random() * 2)
         );
         const selectedCards = cards.slice(0, numToPlay);
-        console.log("SELECT CARDS: ", selectedCards);
-
         // Decide whether to bluff based on personality
         const baseBluffProb = 0.2;
         const adjustedBluffProb =
@@ -114,7 +106,6 @@ export class BeginnerStrategy {
           ];
           const bluffValue =
             possibleValues[Math.floor(Math.random() * possibleValues.length)];
-          console.log("VALUE: ", value);
           return { selectedCards, bluffText: bluffValue };
         } else {
           // Tell the truth

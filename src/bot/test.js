@@ -35,7 +35,4 @@ const gameState = {
 };
 
 // Step 4: Run the bot's decision logic
-bot.decideAction(gameState).then((action) => {
-  console.log("\n--- Bot Decision ---");
-  console.log(action);
-});
+bot.decideAction(gameState);

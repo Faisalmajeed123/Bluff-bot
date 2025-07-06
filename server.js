@@ -33,7 +33,6 @@ app.use("/js", express.static(path.join(__dirname, "src", "js")));
 app.set("view engine", "hbs");
 app.set("views", path.join(__dirname, "src", "views"));
 
-console.log("ROOMS", rooms);
 app.get("/", (req, res) => {
   res.render("game");
 });
@@ -96,7 +95,6 @@ io.on("connection", (socket) => {
     });
     rooms[roomId].playerCards[bot.id] = [];
     roomCounts[roomId]++;
-    console.log("==============================================", bot);
   }
 
   socket.join(roomId);
@@ -112,13 +110,6 @@ io.on("connection", (socket) => {
     rooms[roomId].playerCards[socket.id] = [];
     roomCounts[roomId]++;
   }
-  // rooms[roomId].clients.push(socket);
-  console.log(
-    "New user joined connected with room ID: " +
-      roomId +
-      ", member count: " +
-      roomCounts[roomId]
-  );
 
   // If the room reaches its capacity, emit a message to restrict further entry
   if (roomCounts[roomId] >= roomCapacity) {
@@ -146,7 +137,6 @@ io.on("connection", (socket) => {
     }, 5000);
   }
   function executeDuringDelay(roomId) {
-    console.log("ROOMID", roomId);
     io.to(roomId).emit("STOC-SHUFFLING", "shuffle");
   }
 
@@ -213,11 +203,6 @@ io.on("connection", (socket) => {
       };
     }
 
-    // if (rooms[roomId].newGame === true) {
-    //   rooms[roomId].newGame = false;
-    //   rooms[roomId].bluff_text = bluff_text;
-    // }
-
     if (bluff_text) {
       rooms[roomId].bluff_text = bluff_text;
       rooms[roomId].gameState.currentRank = bluff_text;
@@ -247,128 +232,16 @@ io.on("connection", (socket) => {
       if (!rooms[roomId].raiseActionDone) {
         io.to(roomId).emit("STOC-RAISE-TIME-OVER");
         changeTurn(roomId, io);
-        // console.log("Passed players:", rooms[roomId].passedPlayers);
-        // console.log("Won users:", rooms[roomId].wonUsers);
-        // console.log("Current turn index:", rooms[roomId].currentTurnIndex);
       }
     }, 15000);
   });
 
   socket.on("CTOS-RAISE", (raisedClientPos) => {
-    rooms[roomId].raiseActionDone = true;
-    const poppedElements = [];
-    const poppedSuits = [];
-    rooms[roomId].playinguserfail = false;
-
-    for (let i = 0; i < lastPlayedCardCount; i++) {
-      if (rooms[roomId].CardStack.length > 0) {
-        const poppedSuit = rooms[roomId].SuitStack.pop();
-        const poppedElement = rooms[roomId].CardStack.pop();
-        if (poppedElement != rooms[roomId].bluff_text) {
-          console.log(
-            "popped element,input",
-            poppedElement,
-            rooms[roomId].bluff_text
-          );
-          rooms[roomId].playinguserfail = true;
-
-          const receiverSocket =
-            rooms[roomId].clients[rooms[roomId].currentTurnIndex];
-          rooms[roomId].playerCards[receiverSocket.id].push(
-            ...rooms[roomId].CardStack,
-            ...poppedElements
-          );
-          rooms[roomId].gameState.players = rooms[roomId].clients.map(
-            (client) => ({
-              id: client.id,
-              cardCount: rooms[roomId].playerCards[client.id]?.length || 0,
-            })
-          );
-
-          console.log("playinguserfail:", rooms[roomId].playinguserfail);
-        }
-        poppedElements.push(poppedElement);
-        poppedSuits.push(poppedSuit);
-      } else {
-        break; // Stack is empty, exit the loop
-      }
-    }
-    console.log("poppedsuits:", poppedSuits);
-
-    if (rooms[roomId].playinguserfail) {
-      rooms[roomId].playerGoingToWin = -1;
-      io.to(roomId).emit(
-        "STOC-SHOW-RAISED-CARDS",
-        poppedElements,
-        poppedSuits,
-        raisedClientPos,
-        rooms[roomId].currentTurnIndex
-      );
-      console.log("cardstackback:", rooms[roomId].CardStack);
-      rooms[roomId].clients[rooms[roomId].currentTurnIndex].emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        rooms[roomId].CardStack,
-        poppedElements,
-        rooms[roomId].SuitStack,
-        poppedSuits
-      );
-      rooms[roomId].currentTurnIndex =
-        (raisedClientPos - 1 + rooms[roomId].clients.length) %
-        rooms[roomId].clients.length;
-    } else {
-      io.to(roomId).emit(
-        "STOC-SHOW-RAISED-CARDS",
-        poppedElements,
-        poppedSuits,
-        rooms[roomId].currentTurnIndex,
-        raisedClientPos
-      );
-      console.log("raisedClientPos  " + raisedClientPos);
-      rooms[roomId].currentTurnIndex =
-        (rooms[roomId].currentTurnIndex - 1) % rooms[roomId].clients.length;
-      const Openedclient = rooms[roomId].clients[raisedClientPos];
-      Openedclient.emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        rooms[roomId].CardStack,
-        poppedElements,
-        rooms[roomId].SuitStack,
-        poppedSuits
-      );
-      if (rooms[roomId].playerGoingToWin != -1) {
-        rooms[roomId].wonUsers.push(rooms[roomId].playerGoingToWin);
-        io.to(roomId).emit("STOC-PLAYER-WON", rooms[roomId].playerGoingToWin);
-        rooms[roomId].playerGoingToWin = -1;
-      }
-    }
-
-    rooms[roomId].gameState.lastAction = {
-      type: "raise",
-      playerId: socket.id,
-      bluffText: "",
-      wasSuccessful: !rooms[roomId].playinguserfail,
-    };
-    rooms[roomId].CardStack = [];
-    rooms[roomId].SuitStack = [];
-    rooms[roomId].gameState.discardPile = [];
-    rooms[roomId].passedPlayers.length = 0;
-    rooms[roomId].newGame = true;
-
-    setTimeout(() => {
-      io.to(roomId).emit("STOC-PLAY-OVER");
-    }, 3000);
-
-    setTimeout(() => {
-      changeTurn(roomId);
-    }, 5000);
+    handleRaise(roomId, raisedClientPos);
   });
 
   socket.on("CTOS-PASS", (pos) => {
     rooms[roomId].passedPlayers.push(pos);
-    console.log(
-      "PASSED PLAYER LENGTH , WON PLAYER LENGTH:",
-      rooms[roomId].passedPlayers.length,
-      rooms[roomId].wonUsers.length
-    );
     io.to(roomId).emit("STOC-GAME-PLAYED", 0, rooms[roomId].bluff_text);
     rooms[roomId].gameState.lastAction = {
       type: "pass",
@@ -403,42 +276,75 @@ io.on("connection", (socket) => {
     );
     rcount = roomCounts[roomId];
     rcount--;
-    console.log("the room count is:", rcount);
     if (roomCounts[roomId] <= 0) {
       delete roomCounts[roomId];
       delete rooms[roomId];
-      console.log("room ented");
     }
   });
 });
 
 async function playBotTurn(roomId) {
   const room = rooms[roomId];
+  if (!room) {
+    console.error(`Room ${roomId} does not exist.`);
+    return;
+  }
+
   const botSocket = room.clients[room.currentTurnIndex];
+  if (!botSocket || !botSocket.isBot || !botSocket.botInstance) {
+    console.error(
+      `Bot turn called but current player is not a bot.`,
+      botSocket
+    );
+    changeTurn(roomId);
+    return;
+  }
+
   const bot = botSocket.botInstance;
   const botId = botSocket.id;
 
-  // fill up gameState with latest info
+  console.log("============================", room.gameState);
+
+  // Set current player in game state
   room.gameState.players = room.clients.map((client) => ({
     id: client.id,
     cardCount: room.playerCards[client.id]?.length || 0,
   }));
   room.gameState.currentPlayerId = botId;
 
-  const gameState = room.gameState;
-
   try {
-    const action = await bot.decideAction(gameState);
+    console.log("---------------------------------1");
+    const action = await bot.decideAction(room.gameState);
+    console.log("---------------------------------2", action);
 
-    console.log(`🤖 Bot ${botId} decided:`, action);
+    if (action.type === "raise") {
+      console.log(`[BOT ${botId}] decided to RAISE immediately.`);
+      const lastPlayerIndex = room.clients.findIndex(
+        (c) => c.id === room.gameState.lastAction.playerId
+      );
+      if (lastPlayerIndex !== -1) {
+        handleRaise(roomId, lastPlayerIndex);
+      } else {
+        console.error("Could not find player to raise against.");
+        changeTurn(roomId);
+      }
+      return;
+    }
 
     if (action.type === "place") {
-      room.playerCards[botId] = room.playerCards[botId].filter(
-        (card) =>
-          !action.cards.some(
-            (sel) => sel.suit === card.suit && sel.value === card.value
-          )
-      );
+      console.log(`[BOT ${botId}] decided to PLACE cards.`);
+
+      // Remove placed cards from bot's hand
+      for (const playedCard of action.cards) {
+        const index = room.playerCards[botId].findIndex(
+          (c) => c.suit === playedCard.suit && c.value === playedCard.value
+        );
+        if (index !== -1) {
+          room.playerCards[botId].splice(index, 1);
+        } else {
+          console.warn(`Bot tried to play card it doesn’t have:`, playedCard);
+        }
+      }
 
       // Update stacks
       action.cards.forEach((card) => {
@@ -447,16 +353,21 @@ async function playBotTurn(roomId) {
         room.gameState.discardPile.push(card);
       });
 
-      room.bluff_text = action.bluffText;
-      room.newGame = false;
+      // If this starts a new round, set bluff_text
+      if (room.newGame) {
+        room.bluff_text = action.bluffText;
+        room.newGame = false;
+        room.gameState.currentRank = action.bluffText;
+      }
 
       room.gameState.lastAction = {
         type: "place",
         playerId: botId,
-        bluffText: action.bluffText,
-        cards: selectedCards,
+        bluffText: room.bluff_text,
+        cards: action.cards,
         wasSuccessful: null,
       };
+      room.lastPlayedCardCount = action.cards.length;
 
       io.to(roomId).emit(
         "STOC-GAME-PLAYED",
@@ -464,16 +375,26 @@ async function playBotTurn(roomId) {
         room.bluff_text,
         room.currentTurnIndex
       );
-      io.to(roomId).emit("STOC-RAISE-TIME-START");
 
+      room.raiseActionDone = false;
+
+      io.to(roomId).emit("STOC-RAISE-TIME-START");
       setTimeout(() => {
-        io.to(roomId).emit("STOC-RAISE-TIME-OVER");
-        changeTurn(roomId);
+        if (!room.raiseActionDone) {
+          io.to(roomId).emit("STOC-RAISE-TIME-OVER");
+          changeTurn(roomId);
+        }
       }, 9000);
-    } else if (action.type === "pass") {
-      rooms[roomId].passedPlayers.push(room.currentTurnIndex);
+
+      return;
+    }
+
+    if (action.type === "pass") {
+      console.log(`[BOT ${botId}] decided to PASS.`);
+      room.passedPlayers.push(room.currentTurnIndex);
 
       io.to(roomId).emit("STOC-GAME-PLAYED", 0, room.bluff_text);
+
       room.gameState.lastAction = {
         type: "pass",
         playerId: botId,
@@ -482,22 +403,13 @@ async function playBotTurn(roomId) {
       };
 
       changeTurn(roomId);
-    } else if (action.type === "raise") {
-      console.log(`Bot ${botId} wants to raise!`);
-
-      const lastPlayerIndex = room.clients.findIndex(
-        (c) => c.id === gameState.lastAction.playerId
-      );
-
-      if (lastPlayerIndex !== -1) {
-        handleRaise(roomId, lastPlayerIndex);
-      } else {
-        console.error("Could not find player to raise against.");
-        changeTurn(roomId);
-      }
+      return;
     }
+
+    console.warn(`Bot ${botId} returned unknown action type:`, action.type);
+    changeTurn(roomId);
   } catch (err) {
-    console.error(`Error in bot turn:`, err);
+    console.error(`Error during bot turn:`, err);
     changeTurn(roomId);
   }
 }
@@ -505,121 +417,90 @@ async function playBotTurn(roomId) {
 function handleRaise(roomId, raisedClientPos) {
   const room = rooms[roomId];
   room.raiseActionDone = true;
+
   const poppedElements = [];
   const poppedSuits = [];
-  room.playinguserfail = false;
+  let bluffFailed = false;
 
-  const lastPlayedCardCount = room.CardStack.length;
+  const blufferId = room.gameState.lastAction.playerId;
+  const blufferPos = room.clients.findIndex((c) => c.id === blufferId);
+  const raiserPos = raisedClientPos;
 
-  for (let i = 0; i < lastPlayedCardCount; i++) {
-    if (room.CardStack.length > 0) {
-      const poppedSuit = room.SuitStack.pop();
-      const poppedElement = room.CardStack.pop();
-
-      if (poppedElement != room.bluff_text) {
-        room.playinguserfail = true;
-
-        const receiverSocket = room.clients[room.currentTurnIndex];
-        room.playerCards[receiverSocket.id].push(
-          ...room.CardStack,
-          ...poppedElements
-        );
-
-        room.gameState.players = room.clients.map((client) => ({
-          id: client.id,
-          cardCount: room.playerCards[client.id]?.length || 0,
-        }));
-      }
-
-      poppedElements.push(poppedElement);
-      poppedSuits.push(poppedSuit);
-    } else {
+  // check if bluff was wrong
+  for (let i = 0; i < room.lastPlayedCardCount; i++) {
+    const idxFromTop = room.CardStack.length - 1 - i;
+    if (idxFromTop < 0) break;
+    if (String(room.CardStack[idxFromTop]) !== String(room.bluff_text)) {
+      bluffFailed = true;
       break;
     }
   }
 
-  if (room.playinguserfail) {
-    room.playerGoingToWin = -1;
-    io.to(roomId).emit(
-      "STOC-SHOW-RAISED-CARDS",
-      poppedElements,
-      poppedSuits,
-      raisedClientPos,
-      room.currentTurnIndex
-    );
+  // loser is the one who bluffed wrongly, or the raiser if bluff was actually correct
+  const loserPos = bluffFailed ? blufferPos : raiserPos;
+  const loser = room.clients[loserPos];
 
-    const receiverSocket = room.clients[room.currentTurnIndex];
-    if (receiverSocket.isBot) {
-      // bots don’t have .socket
-      io.to(receiverSocket.id).emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        room.CardStack,
-        poppedElements,
-        room.SuitStack,
-        poppedSuits
-      );
-    } else {
-      receiverSocket.socket.emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        room.CardStack,
-        poppedElements,
-        room.SuitStack,
-        poppedSuits
-      );
-    }
+  room.playinguserfail = bluffFailed;
 
-    room.currentTurnIndex =
-      (raisedClientPos - 1 + room.clients.length) % room.clients.length;
-  } else {
-    io.to(roomId).emit(
-      "STOC-SHOW-RAISED-CARDS",
-      poppedElements,
-      poppedSuits,
-      room.currentTurnIndex,
-      raisedClientPos
-    );
+  while (room.CardStack.length > 0) {
+    const value = room.CardStack.pop();
+    const suit = room.SuitStack.pop();
+    poppedElements.push(value);
+    poppedSuits.push(suit);
 
-    room.currentTurnIndex =
-      (room.currentTurnIndex - 1 + room.clients.length) % room.clients.length;
-
-    const openedClient = room.clients[raisedClientPos];
-    if (openedClient.isBot) {
-      io.to(openedClient.id).emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        room.CardStack,
-        poppedElements,
-        room.SuitStack,
-        poppedSuits
-      );
-    } else {
-      openedClient.socket.emit(
-        "STOC1C-DUMP-PENALTY-CARDS",
-        room.CardStack,
-        poppedElements,
-        room.SuitStack,
-        poppedSuits
-      );
-    }
-
-    if (room.playerGoingToWin != -1) {
-      room.wonUsers.push(room.playerGoingToWin);
-      io.to(roomId).emit("STOC-PLAYER-WON", room.playerGoingToWin);
-      room.playerGoingToWin = -1;
-    }
+    room.playerCards[loser.id].push({ value, suit });
   }
 
-  room.gameState.lastAction = {
-    type: "raise",
-    playerId: room.clients[raisedClientPos].id,
-    bluffText: "",
-    wasSuccessful: !room.playinguserfail,
-  };
+  io.to(roomId).emit(
+    "STOC-SHOW-RAISED-CARDS",
+    poppedElements,
+    poppedSuits,
+    raiserPos,
+    blufferPos
+  );
+
+  setTimeout(() => {
+    if (loser.isBot) {
+      io.to(loser.id).emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        [],
+        poppedElements,
+        [],
+        poppedSuits
+      );
+    } else {
+      loser.socket.emit(
+        "STOC1C-DUMP-PENALTY-CARDS",
+        [],
+        poppedElements,
+        [],
+        poppedSuits
+      );
+    }
+  }, 4000);
 
   room.CardStack = [];
   room.SuitStack = [];
   room.gameState.discardPile = [];
   room.passedPlayers.length = 0;
   room.newGame = true;
+
+  room.gameState.lastAction = {
+    type: "raise",
+    playerId: room.clients[raisedClientPos].id,
+    bluffText: "",
+    wasSuccessful: !bluffFailed,
+  };
+
+  if (!bluffFailed && room.playerGoingToWin !== -1) {
+    room.wonUsers.push(room.playerGoingToWin);
+    io.to(roomId).emit("STOC-PLAYER-WON", room.playerGoingToWin);
+    room.playerGoingToWin = -1;
+  }
+
+  // The next turn should go to the raiser if bluff failed,
+  // or to the bluffer if bluff succeeded
+  room.currentTurnIndex = bluffFailed ? blufferPos : raiserPos;
 
   setTimeout(() => {
     io.to(roomId).emit("STOC-PLAY-OVER");
@@ -638,13 +519,18 @@ function assignTurns(roomId) {
 
 function changeTurn(roomId) {
   const room = rooms[roomId];
-  room.currentTurnIndex = (room.currentTurnIndex + 1) % room.clients.length;
 
+  if (!room) {
+    console.error(`Room ${roomId} not found`);
+    return;
+  }
+
+  const prevTurn = room.currentTurnIndex;
+  room.currentTurnIndex = (room.currentTurnIndex + 1) % room.clients.length;
   const nextSocket = room.clients[room.currentTurnIndex];
   const nextId = nextSocket.id;
   room.gameState.currentPlayerId = nextId;
-
-  console.log("Updated gameState for room:", roomId, room.gameState);
+  io.to(roomId).emit("STOC-SET-WHOS-TURN", room.currentTurnIndex, room.newGame);
 
   if (room.wonUsers.length === room.clients.length - 1) {
     io.to(roomId).emit("STOC-GAME-OVER", room.wonUsers);
@@ -652,13 +538,7 @@ function changeTurn(roomId) {
   }
 
   if (nextSocket.isBot) {
-    setTimeout(() => playBotTurn(roomId), 1000);
-  } else {
-    io.to(roomId).emit(
-      "STOC-SET-WHOS-TURN",
-      room.currentTurnIndex,
-      room.newGame
-    );
+    playBotTurn(roomId);
   }
 }
 
