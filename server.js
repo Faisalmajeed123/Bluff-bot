@@ -87,7 +87,7 @@ io.on("connection", (socket) => {
     };
 
     // Bot players
-    const bot = new BotPlayer(`bot-${uuidv4()}`, "Easy Bot", "intermediate");
+    const bot = new BotPlayer(`bot-${uuidv4()}`, "Easy Bot", "advanced");
     rooms[roomId].clients.push({
       id: bot.id,
       isBot: true,
@@ -171,10 +171,6 @@ io.on("connection", (socket) => {
     });
 
     if (remainingCards == 0) {
-      console.log(
-        "Last played user is going to win! position : ",
-        rooms[roomId].currentTurnIndex
-      );
       rooms[roomId].playerGoingToWin = rooms[roomId].currentTurnIndex;
     }
 
@@ -236,8 +232,19 @@ io.on("connection", (socket) => {
     }, 15000);
   });
 
-  socket.on("CTOS-RAISE", (raisedClientPos) => {
-    handleRaise(roomId, raisedClientPos);
+  socket.on("CTOS-RAISE", () => {
+    const room = rooms[roomId];
+    const raiserPos = room.clients.findIndex((c) => c.id === socket.id);
+    const blufferPos = room.clients.findIndex(
+      (c) => c.id === room.gameState.lastAction.playerId
+    );
+
+    if (raiserPos === blufferPos) {
+      socket.emit("ERROR", "You cannot raise yourself.");
+      return;
+    }
+
+    handleRaise(roomId, raiserPos);
   });
 
   socket.on("CTOS-PASS", (pos) => {
@@ -271,9 +278,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(
-      " user disconnected with roomID:" + roomId + "member" + roomCounts[roomId]
-    );
     rcount = roomCounts[roomId];
     rcount--;
     if (roomCounts[roomId] <= 0) {
@@ -303,8 +307,6 @@ async function playBotTurn(roomId) {
   const bot = botSocket.botInstance;
   const botId = botSocket.id;
 
-  console.log("============================", room.gameState);
-
   // Set current player in game state
   room.gameState.players = room.clients.map((client) => ({
     id: client.id,
@@ -313,17 +315,15 @@ async function playBotTurn(roomId) {
   room.gameState.currentPlayerId = botId;
 
   try {
-    console.log("---------------------------------1");
     const action = await bot.decideAction(room.gameState);
-    console.log("---------------------------------2", action);
 
     if (action.type === "raise") {
-      console.log(`[BOT ${botId}] decided to RAISE immediately.`);
       const lastPlayerIndex = room.clients.findIndex(
         (c) => c.id === room.gameState.lastAction.playerId
       );
       if (lastPlayerIndex !== -1) {
-        handleRaise(roomId, lastPlayerIndex);
+        const raiserPos = room.currentTurnIndex;
+        handleRaise(roomId, raiserPos);
       } else {
         console.error("Could not find player to raise against.");
         changeTurn(roomId);
@@ -332,9 +332,6 @@ async function playBotTurn(roomId) {
     }
 
     if (action.type === "place") {
-      console.log(`[BOT ${botId}] decided to PLACE cards.`);
-
-      // Remove placed cards from bot's hand
       for (const playedCard of action.cards) {
         const index = room.playerCards[botId].findIndex(
           (c) => c.suit === playedCard.suit && c.value === playedCard.value
@@ -390,9 +387,7 @@ async function playBotTurn(roomId) {
     }
 
     if (action.type === "pass") {
-      console.log(`[BOT ${botId}] decided to PASS.`);
       room.passedPlayers.push(room.currentTurnIndex);
-
       io.to(roomId).emit("STOC-GAME-PLAYED", 0, room.bluff_text);
 
       room.gameState.lastAction = {
@@ -451,12 +446,14 @@ function handleRaise(roomId, raisedClientPos) {
     room.playerCards[loser.id].push({ value, suit });
   }
 
+  const winnerPos = bluffFailed ? raiserPos : blufferPos;
+
   io.to(roomId).emit(
     "STOC-SHOW-RAISED-CARDS",
     poppedElements,
     poppedSuits,
-    raiserPos,
-    blufferPos
+    winnerPos,
+    loserPos
   );
 
   setTimeout(() => {

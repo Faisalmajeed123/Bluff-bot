@@ -1,43 +1,27 @@
 export const Personalities = {
   AGGRESSIVE: {
     name: "Aggressive",
-    description: "Bluffs often and challenges frequently",
-    bluffProbabilityModifier: 0.3,
-    challengeProbabilityModifier: 0.25,
-    multiCardPlayModifier: 0.2,
-    riskTolerance: 0.8,
-    adaptiveRate: 0.15,
-  },
-
-  CAUTIOUS: {
-    name: "Cautious",
-    description: "Rarely bluffs and challenges only when confident",
-    bluffProbabilityModifier: -0.2,
-    challengeProbabilityModifier: -0.15,
-    multiCardPlayModifier: -0.1,
-    riskTolerance: 0.3,
-    adaptiveRate: 0.2,
-  },
-
-  BALANCED: {
-    name: "Balanced",
-    description: "Uses a mix of bluffing and honest play",
-    bluffProbabilityModifier: 0.0,
-    challengeProbabilityModifier: 0.0,
-    multiCardPlayModifier: 0.0,
-    riskTolerance: 0.5,
-    adaptiveRate: 0.25,
-  },
-
-  UNPREDICTABLE: {
-    name: "Unpredictable",
-    description: "Behavior varies wildly from round to round",
     bluffProbabilityModifier: 0.1,
     challengeProbabilityModifier: 0.1,
-    multiCardPlayModifier: 0.1,
+    riskTolerance: 0.7,
+  },
+  CAUTIOUS: {
+    name: "Cautious",
+    bluffProbabilityModifier: -0.1,
+    challengeProbabilityModifier: -0.1,
+    riskTolerance: 0.3,
+  },
+  BALANCED: {
+    name: "Balanced",
+    bluffProbabilityModifier: 0,
+    challengeProbabilityModifier: 0,
+    riskTolerance: 0.5,
+  },
+  UNPREDICTABLE: {
+    name: "Unpredictable",
+    bluffProbabilityModifier: 0.1,
+    challengeProbabilityModifier: 0.05,
     riskTolerance: 0.6,
-    adaptiveRate: 0.1,
-    randomnessFactor: 0.4,
   },
 };
 

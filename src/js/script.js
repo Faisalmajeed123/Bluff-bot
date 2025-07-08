@@ -302,6 +302,7 @@ socket.on("STO1C-DRAW-CARDS", (subpartition) => {
     // handleOnCards(card.suit, card.value);
   });
 
+  sort_cards("card-container");
   notifyScreenReader("Cards received!", "assertive");
 });
 
@@ -457,7 +458,7 @@ socket.on("STOC-GAME-PLAYED", (cardCount, bluffText, playerIndex) => {
 });
 
 function raisecards() {
-  socket.emit("CTOS-RAISE", pos);
+  socket.emit("CTOS-RAISE");
   const raiseBtn = document.getElementById("raise-btn");
   raiseBtn.disabled = true;
 }
