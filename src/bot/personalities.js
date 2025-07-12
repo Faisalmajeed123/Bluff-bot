@@ -49,10 +49,10 @@ export function getPersonalityForDifficulty(difficultyLevel) {
     case "advanced":
       const advancedDistribution = [
         Personalities.AGGRESSIVE,
-        Personalities.AGGRESSIVE,
+        Personalities.CAUTIOUS,
+        Personalities.CAUTIOUS,
+        Personalities.UNPREDICTABLE,
         Personalities.BALANCED,
-        Personalities.UNPREDICTABLE,
-        Personalities.UNPREDICTABLE,
       ];
       return advancedDistribution[
         Math.floor(Math.random() * advancedDistribution.length)

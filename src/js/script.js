@@ -20,7 +20,8 @@ let nameOfBots = [
   "Hartley",
 ];
 
-whosTurn = Array.from({ length: 2 }, (_, i) => i);
+const totalPlayers = 4;
+whosTurn = Array.from({ length: totalPlayers }, (_, i) => i);
 
 const playerNames = [];
 const usedNames = [];
@@ -33,8 +34,8 @@ function getUniqueBotName() {
   return name;
 }
 
-for (let i = 0; i < 2; i++) {
-  if (i === 1) {
+for (let i = 0; i < totalPlayers; i++) {
+  if (i === totalPlayers - 1) {
     playerNames.push("Me");
   } else {
     playerNames.push(getUniqueBotName());
@@ -208,8 +209,6 @@ socket.on("STO1C-SET-POSITION", (index) => {
     player.innerHTML = "";
     player.innerText = "Me";
     notifyScreenReader("You are in position : " + (index + 1), "polite");
-  } else {
-    console.warn(`Element with ID user${pos} not found`);
   }
 });
 
@@ -450,9 +449,9 @@ socket.on("STOC-GAME-PLAYED", (cardCount, bluffText, playerIndex) => {
   }
   const playedByName =
     playerNames?.[playerIndex] || `Player ${playerIndex + 1}`;
-
+  const cardSpelling = cardCount === 1 ? "card" : "cards";
   notifyScreenReader(
-    `${playedByName} played ${cardCount} cards as ${bluffText}`,
+    `${playedByName} played ${cardCount} ${cardSpelling} as ${bluffText}`,
     "assertive"
   );
 });

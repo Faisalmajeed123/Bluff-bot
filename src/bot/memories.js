@@ -1,8 +1,3 @@
-// /**
-//  * Memory System for AI Bots
-//  * Tracks player actions, bluff patterns, and adapts strategies
-//  */
-
 export class MemorySystem {
   constructor(adaptiveRate = 0.2) {
     this.playerProfiles = new Map(); // Stores data about each player
