@@ -18,6 +18,27 @@
   box-shadow: 0 0 10px #719ece;
 }
 
+.hint-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #33ff00;
+  color: #000;
+  border: 2px solid #000;
+  padding: 8px 30px;
+  border-radius: 4px;
+  z-index: 1000;
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.hint-button:hover {
+  background-color: #33ff00;
+  color: #000;
+  border: 2px solid #000;
+  padding: 8px 30px;
+}
+
 .cardsContainer {
   display: flex;
   gap: 5px;

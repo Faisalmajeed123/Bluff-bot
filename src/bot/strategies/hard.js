@@ -1,6 +1,24 @@
 export class AdvancedStrategy {
   constructor(personality) {
     this.personality = personality || {};
+    this.currentGameState = {};
+    this.currentBotCards = [];
+  }
+
+  setGameState(state) {
+    this.currentGameState = state;
+  }
+
+  setBotCards(cards) {
+    this.currentBotCards = cards;
+  }
+
+  getGameState() {
+    return this.currentGameState;
+  }
+
+  getBotCards() {
+    return this.currentBotCards;
   }
 
   decideChallenge(gameState, botCards, memory) {

@@ -1,3 +1,6 @@
+import { HintEngine } from "../bot/hint.js";
+import { AdvancedStrategy } from "../bot/strategies/hard.js";
+
 var pos;
 var whosTurn;
 var newGame;
@@ -6,6 +9,11 @@ let numberOfPlayers;
 let containerCount = 0;
 let listenNodeInserted = false;
 let childrensArray = [];
+let gameState = {};
+let botCards = [];
+let hintClickCount = 0;
+const maxHintUses = 3;
+const hintEngine = new HintEngine();
 
 let nameOfBots = [
   "Sebastian",
@@ -279,6 +287,7 @@ function sort_cards(container_id) {
 }
 
 socket.on("STO1C-DRAW-CARDS", (subpartition) => {
+  botCards = subpartition;
   cards = subpartition;
   const playerCards = subpartition;
   const cardContainer = document.getElementById("card-container");
@@ -308,6 +317,21 @@ socket.on("STO1C-DRAW-CARDS", (subpartition) => {
 socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   whosTurn = value;
   newGame = value2;
+
+  gameState.lastAction = {
+    playerId: whosTurn,
+    cards: [],
+    bluffText: lastGameBluffText,
+    type: "place",
+  };
+
+  gameState.discardPile = [];
+  gameState.players = [
+    { cardCount: cards?.length || 0 },
+    { cardCount: 0 },
+    { cardCount: 0 },
+    { cardCount: 0 },
+  ];
 
   for (let i = 0; i < numberOfPlayers; i++) {
     const player = document.getElementById(`user${i}`);
@@ -577,6 +601,39 @@ socket.on("STOC-GAME-OVER", (wonUsers) => {
   });
   alert(gameOverMessage);
 });
+
+document.getElementById("hint-btn").addEventListener("click", showHint);
+
+function showHint() {
+  if (hintClickCount >= maxHintUses) return;
+
+  const strategy = new AdvancedStrategy();
+  strategy.setGameState(gameState);
+  strategy.setBotCards(botCards);
+  const hintState = strategy.getGameState();
+  const hintCards = strategy.getBotCards();
+  const hint = hintEngine.getHint(hintState, hintCards);
+  let message = hint.message;
+  console.log("MESSAGE: ", hint);
+  notifyScreenReader(message);
+
+  // Increment the counter
+  hintClickCount++;
+
+  // Calculate remaining hints
+  const remainingHints = maxHintUses - hintClickCount;
+
+  // Update button text
+  const hintBtn = document.getElementById("hint-btn");
+  hintBtn.innerText = `Hint (${remainingHints})`;
+
+  // If no more hints, disable the button
+  if (remainingHints <= 0) {
+    hintBtn.disabled = true;
+    hintBtn.style.backgroundColor = "#ccc";
+    hintBtn.style.cursor = "not-allowed";
+  }
+}
 
 window.passaction = passaction;
 window.placeCards = placeCards;

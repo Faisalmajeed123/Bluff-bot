@@ -1,8 +1,12 @@
-
-# Accessible Bluff Bot 
+# Accessible Bluff Bot
 
 A real-time multiplayer bluff card game with AI opponents, built with Node.js and Socket.IO
 
+## 📄 Documentation
+
+- [Project Tracker](/Project%20Tracker.xlsx)
+- [Variable File](/Variable%20File.xlsx)
+- [Decision Making](/Decision%20Making.pdf)
 
 ## Setup
 
@@ -37,5 +41,3 @@ Start the server
 2- The game automatically assigns you to a room with 3 AI bots.
 
 3- Take turns placing cards, bluffing, and calling out others’ bluffs!
-
-

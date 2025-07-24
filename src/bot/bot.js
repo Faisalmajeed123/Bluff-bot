@@ -4,7 +4,6 @@ import { getPersonalityForDifficulty, Personalities } from "./personalities.js";
 import { BeginnerStrategy } from "./strategies/easy.js";
 import { IntermediateStrategy } from "./strategies/medium.js";
 import { AdvancedStrategy } from "./strategies/hard.js";
-
 export class BotPlayer {
   constructor(id, name, difficultyLevel) {
     this.id = id;
@@ -46,9 +45,9 @@ export class BotPlayer {
         return new BeginnerStrategy(this.personality);
     }
   }
+
   decideAction(gameState) {
     return new Promise((resolve) => {
-      // Add a small delay to make the bot's actions feel more natural
       setTimeout(() => {
         if (this.memory.playerProfiles.size === 0) {
           this.memory.initializePlayers(gameState.players.map((p) => p.id));
