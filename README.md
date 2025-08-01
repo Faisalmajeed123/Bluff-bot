@@ -4,9 +4,8 @@ A real-time multiplayer bluff card game with AI opponents, built with Node.js an
 
 ## 📄 Documentation
 
-- [Project Tracker](/Project%20Tracker.xlsx)
-- [Variable File](/Variable%20File.xlsx)
-- [Decision Making](/Decision%20Making.pdf)
+- [List of Variables](/Variable%20File.xlsx)
+- [How decision making works](/Decision%20Making.pdf)
 
 ## Setup
 

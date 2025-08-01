@@ -93,6 +93,12 @@ io.on("connection", (socket) => {
         `Master Bot ${i}`,
         "advanced"
       );
+      // botStrategy.setEmitFunction((msg) => {
+      //   io.to(roomId).emit("botMessage", {
+      //     botId: bot.id,
+      //     text: msg,
+      //   });
+      // });
       rooms[roomId].clients.push({
         id: bot.id,
         isBot: true,
@@ -104,9 +110,8 @@ io.on("connection", (socket) => {
   }
 
   socket.join(roomId);
-
-  // make sure we only add the human ONCE
   const humanExists = rooms[roomId].clients.some((c) => c.id === socket.id);
+
   if (!humanExists) {
     rooms[roomId].clients.push({
       id: socket.id,
@@ -123,6 +128,7 @@ io.on("connection", (socket) => {
     assignTurns(roomId);
 
     setTimeout(() => {
+      if (!rooms[roomId]) return;
       serverfn.delayedCode(
         rooms[roomId].cardset,
         roomCapacity,
@@ -178,20 +184,22 @@ io.on("connection", (socket) => {
     }
 
     rooms[roomId].raiseActionDone = false;
-
     io.to(roomId).emit("STOC-RAISE-TIME-START");
+    io.to(roomId).emit("STOC-CHOOSE-EMOJI", socket.id);
 
     if (rooms[roomId].raiseTimer) {
       clearTimeout(rooms[roomId].raiseTimer);
     }
 
-    rooms[roomId].raiseTimer = setTimeout(() => {
-      if (!rooms[roomId].raiseActionDone) {
-        io.to(roomId).emit("STOC-RAISE-TIME-OVER");
-        rooms[roomId].raiseActionDone = true;
-        changeTurn(roomId);
-      }
-    }, 15000);
+    setTimeout(() => {
+      rooms[roomId].raiseTimer = setTimeout(() => {
+        if (!rooms[roomId].raiseActionDone) {
+          io.to(roomId).emit("STOC-RAISE-TIME-OVER");
+          rooms[roomId].raiseActionDone = true;
+          changeTurn(roomId);
+        }
+      }, 15000);
+    }, 5000);
 
     if (rooms[roomId].newGame) {
       rooms[roomId].bluff_text = bluff_text;
@@ -265,14 +273,33 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
+    console.log("User disconnected:", socket.id);
     room.clients = room.clients.filter((c) => c.id !== socket.id);
-
+    delete room.playerCards[socket.id];
     roomCounts[roomId]--;
 
-    if (room.clients.length <= 0 || roomCounts[roomId] <= 0) {
+    if (room.raiseTimer) {
+      clearTimeout(room.raiseTimer);
+      room.raiseTimer = null;
+    }
+
+    if (room.botInterval) {
+      clearInterval(room.botInterval);
+      room.botInterval = null;
+    }
+
+    if (room.startTimeout) {
+      clearTimeout(room.startTimeout);
+    }
+
+    const humanPlayersLeft = room.clients.filter((c) => !c.isBot);
+    if (humanPlayersLeft.length === 0) {
       delete roomCounts[roomId];
       delete rooms[roomId];
+      return;
     }
+
+    io.to(roomId).emit("STOC-PLAYER-LEFT", socket.id);
   });
 });
 
@@ -530,9 +557,7 @@ function changeTurn(roomId, forceIndex = null) {
   const room = rooms[roomId];
   if (!room) return;
 
-  // ✅ Don’t change turn while waiting for raise to resolve
   if (room.raiseActionDone === false) {
-    console.log("Waiting for raise phase to complete.");
     return;
   }
 

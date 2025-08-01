@@ -1,8 +1,15 @@
+import { maybeGetBotMessage } from "../../helpers/getBotMessage.js";
+
 export class AdvancedStrategy {
   constructor(personality) {
     this.personality = personality || {};
     this.currentGameState = {};
     this.currentBotCards = [];
+    this.emitBotMessage = null;
+  }
+
+  setEmitFunction(fn) {
+    this.emitBotMessage = fn;
   }
 
   setGameState(state) {
@@ -39,13 +46,22 @@ export class AdvancedStrategy {
       4 - cardsPlayedForValue - knownInHand
     );
 
+    let challengeScore = 0;
+    const threshold = 0.8;
+
+    if (challengeScore >= threshold) {
+      const msg = maybeGetBotMessage(this.personality.name, "challenge");
+      if (msg && this.emitBotMessage) {
+        this.emitBotMessage(msg);
+      }
+      return true;
+    }
+
     const bluffRatio =
       memory?.getPlayerBluffProbability(lastAction.playerId) || 0.3;
     const trust = memory?.getPlayerTrustScore(lastAction.playerId) || 0.5;
 
     const gameStage = this.calculateGameStage(gameState);
-
-    let challengeScore = 0;
 
     // Factor: impossible claim (more than 4 of value)
     if (remainingForValue < 0) {
@@ -68,9 +84,6 @@ export class AdvancedStrategy {
 
     // Personality: risk tolerance
     challengeScore *= this.personality.riskTolerance || 1.0;
-
-    const threshold = 0.8;
-
     return challengeScore >= threshold;
   }
 
@@ -89,12 +102,20 @@ export class AdvancedStrategy {
       countsRemaining,
       declaredValue
     );
-    let selectedCards = this.pickCardsForValue(cardGroups, playValue);
+    let selectedCards = this.pickCardsForValue(
+      cardGroups,
+      playValue,
+      gameState
+    );
 
     const bluffProbability = this.shouldBluff(gameStage);
 
     if (bluffProbability > 0.5) {
       const bluffValue = this.pickBluffValue(countsRemaining, playValue);
+      const msg = maybeGetBotMessage(this.personality.name, "bluffing");
+      if (msg && this.emitBotMessage) {
+        this.emitBotMessage(msg);
+      }
       return { selectedCards, bluffText: bluffValue };
     }
 
@@ -116,9 +137,41 @@ export class AdvancedStrategy {
     return sorted[0]?.[0];
   }
 
-  pickCardsForValue(cardGroups, value) {
-    const count = Math.min(2, cardGroups[value].length);
-    return cardGroups[value].slice(0, count);
+  pickCardsForValue(cardGroups, value, gameState) {
+    const cards = cardGroups[value] || [];
+    const countAvailable = cards.length;
+
+    const gameStage = this.calculateGameStage(gameState);
+    const aggression = this.personality.aggression ?? 0.5;
+
+    // Base probability of playing N cards
+    let maxToPlay = Math.min(4, countAvailable);
+    if (maxToPlay <= 1) return cards.slice(0, 1); // can't do more
+
+    // Weight multipliers for how many cards to play
+    const weights = [];
+
+    for (let i = 1; i <= maxToPlay; i++) {
+      // Higher aggression and later stage => more likely to play more cards
+      const weight = i ** aggression * (1 + gameStage);
+      weights.push(weight);
+    }
+
+    // Normalize weights to pick based on probability
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const rand = Math.random() * totalWeight;
+
+    let cumulative = 0;
+    let chosen = 1;
+    for (let i = 0; i < weights.length; i++) {
+      cumulative += weights[i];
+      if (rand <= cumulative) {
+        chosen = i + 1;
+        break;
+      }
+    }
+
+    return cards.slice(0, chosen);
   }
 
   pickBluffValue(countsRemaining, avoidValue) {

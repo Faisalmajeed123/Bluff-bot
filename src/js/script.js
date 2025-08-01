@@ -1,4 +1,5 @@
 import { HintEngine } from "../bot/hint.js";
+import { customBotMessages } from "../bot/messages.js";
 import { AdvancedStrategy } from "../bot/strategies/hard.js";
 
 var pos;
@@ -318,6 +319,7 @@ socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
   whosTurn = value;
   newGame = value2;
 
+  updateHintButtonState();
   gameState.lastAction = {
     playerId: whosTurn,
     cards: [],
@@ -346,14 +348,25 @@ socket.on("STOC-SET-WHOS-TURN", async (value, value2) => {
     placeBtn.disabled = false;
     passBtn.disabled = false;
     messageWhosTurn += "It's your turn!";
-  } else if (whosTurn !== pos) {
+  } else {
     placeBtn.disabled = true;
     passBtn.disabled = true;
-    messageWhosTurn += `It's ${playerNames[whosTurn]} turn!`;
+    const botMessage = getBotTurnMessage(whosTurn);
+    notifyScreenReader(`It's ${playerNames[whosTurn]}'s turn!`);
+    setTimeout(() => {
+      notifyScreenReader(botMessage);
+    }, 1000);
   }
 
-  notifyScreenReader(messageWhosTurn, "assertive");
+  notifyScreenReader(messageWhosTurn);
 });
+
+function getBotTurnMessage(playerIndex) {
+  let randomMessage =
+    customBotMessages[Math.floor(Math.random() * customBotMessages.length)];
+  randomMessage = `${playerNames[whosTurn]}: ${randomMessage}`;
+  return `${randomMessage}`;
+}
 
 function placeCards() {
   var cardContainer = document.getElementById("card-container");
@@ -539,7 +552,6 @@ socket.on(
       cardsGivingBack.push(poppedElements.pop());
       suitsBack.push(poppedSuits.pop());
     }
-    // Push values from stack2 to the combinedStack
     while (CardStack.length > 0) {
       cardsGivingBack.push(CardStack.pop());
       suitsBack.push(SuitStack.pop());
@@ -604,9 +616,17 @@ socket.on("STOC-GAME-OVER", (wonUsers) => {
 
 document.getElementById("hint-btn").addEventListener("click", showHint);
 
+function updateHintButtonState() {
+  const hintBtn = document.getElementById("hint-btn");
+  const isPlayerTurn = whosTurn === pos;
+  hintBtn.disabled = !isPlayerTurn || hintClickCount >= maxHintUses;
+  hintBtn.style.backgroundColor = hintBtn.disabled ? "#ccc" : "#33ff00";
+  hintBtn.style.cursor = hintBtn.disabled ? "not-allowed" : "pointer";
+  hintBtn.style.border = "2px solid #000";
+}
+
 function showHint() {
   if (hintClickCount >= maxHintUses) return;
-
   const strategy = new AdvancedStrategy();
   strategy.setGameState(gameState);
   strategy.setBotCards(botCards);
@@ -614,25 +634,13 @@ function showHint() {
   const hintCards = strategy.getBotCards();
   const hint = hintEngine.getHint(hintState, hintCards);
   let message = hint.message;
-  console.log("MESSAGE: ", hint);
-  notifyScreenReader(message);
-
-  // Increment the counter
+  notifyScreenReader(`Hint: ${message}`);
   hintClickCount++;
-
-  // Calculate remaining hints
   const remainingHints = maxHintUses - hintClickCount;
-
-  // Update button text
   const hintBtn = document.getElementById("hint-btn");
   hintBtn.innerText = `Hint (${remainingHints})`;
 
-  // If no more hints, disable the button
-  if (remainingHints <= 0) {
-    hintBtn.disabled = true;
-    hintBtn.style.backgroundColor = "#ccc";
-    hintBtn.style.cursor = "not-allowed";
-  }
+  updateHintButtonState();
 }
 
 window.passaction = passaction;

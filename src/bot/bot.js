@@ -33,6 +33,11 @@ export class BotPlayer {
   /**
    * Initialize the appropriate strategy based on difficulty level
    */
+
+  getPersonalityMessages() {
+    return this.personality.messages || {};
+  }
+
   initializeStrategy() {
     switch (this.difficultyLevel) {
       case "beginner":
@@ -48,6 +53,7 @@ export class BotPlayer {
 
   decideAction(gameState) {
     return new Promise((resolve) => {
+      const timer = 1000 + Math.random() * 2000;
       setTimeout(() => {
         if (this.memory.playerProfiles.size === 0) {
           this.memory.initializePlayers(gameState.players.map((p) => p.id));
@@ -181,7 +187,7 @@ export class BotPlayer {
             bluffText,
           });
         }
-      }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+      }, timer);
     });
   }
 
