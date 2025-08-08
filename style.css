@@ -7,8 +7,6 @@
 .cards {
   height: 120px;
   border-radius: 8px;
-  /*border: solid;*/
-  /*border-width: 1px;*/
   background-color: #cccccc;
 }
 
@@ -74,11 +72,6 @@
   border: solid;
   border-width: 1px;
 }
-
-/*.friendsContainer {
-    display: flex;
-    gap: 5px;
-  }*/
 
 button {
   border: 3px solid #000000;

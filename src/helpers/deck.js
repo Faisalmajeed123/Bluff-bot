@@ -44,7 +44,3 @@ function freshDeck() {
     });
   });
 }
-// so it is like 2 loops outer loop will select one suite then inner loop will move through all 13 values then second second
-// suite and so on untill all 52 loop are not completed. So the outer loop will run 4 times and inner will run 52 times
-
-//module.exports=Deck;

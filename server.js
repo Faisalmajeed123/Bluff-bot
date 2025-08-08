@@ -8,9 +8,6 @@ import * as Deck from "./src/helpers/deck.js";
 import { v4 as uuidv4 } from "uuid";
 import { BotPlayer } from "./src/bot/bot.js";
 
-// TODO: Add bot object and player object separate, by pushing different values in clients
-// refer to this chat (https://chatgpt.com/c/6863dc29-277c-800a-b5d4-7a42eef03b16)
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
@@ -86,19 +83,12 @@ io.on("connection", (socket) => {
       },
     };
 
-    // Add 3 hard-mode bots
     for (let i = 1; i <= 3; i++) {
       const bot = new BotPlayer(
         `bot-${uuidv4()}`,
         `Master Bot ${i}`,
         "advanced"
       );
-      // botStrategy.setEmitFunction((msg) => {
-      //   io.to(roomId).emit("botMessage", {
-      //     botId: bot.id,
-      //     text: msg,
-      //   });
-      // });
       rooms[roomId].clients.push({
         id: bot.id,
         isBot: true,

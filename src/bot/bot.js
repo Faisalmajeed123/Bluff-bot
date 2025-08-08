@@ -1,4 +1,3 @@
-// Enhanced Bot player implementation for Accessible-Bluff game
 import { MemorySystem } from "./memories.js";
 import { getPersonalityForDifficulty, Personalities } from "./personalities.js";
 import { BeginnerStrategy } from "./strategies/easy.js";
