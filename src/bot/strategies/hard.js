@@ -1,15 +1,8 @@
-import { maybeGetBotMessage } from "../../helpers/getBotMessage.js";
-
 export class AdvancedStrategy {
   constructor(personality) {
     this.personality = personality || {};
     this.currentGameState = {};
     this.currentBotCards = [];
-    this.emitBotMessage = null;
-  }
-
-  setEmitFunction(fn) {
-    this.emitBotMessage = fn;
   }
 
   setGameState(state) {
@@ -48,15 +41,6 @@ export class AdvancedStrategy {
 
     let challengeScore = 0;
     const threshold = 0.8;
-
-    if (challengeScore >= threshold) {
-      const msg = maybeGetBotMessage(this.personality.name, "challenge");
-      if (msg && this.emitBotMessage) {
-        this.emitBotMessage(msg);
-      }
-      return true;
-    }
-
     const bluffRatio =
       memory?.getPlayerBluffProbability(lastAction.playerId) || 0.3;
     const trust = memory?.getPlayerTrustScore(lastAction.playerId) || 0.5;
@@ -112,10 +96,6 @@ export class AdvancedStrategy {
 
     if (bluffProbability > 0.5) {
       const bluffValue = this.pickBluffValue(countsRemaining, playValue);
-      const msg = maybeGetBotMessage(this.personality.name, "bluffing");
-      if (msg && this.emitBotMessage) {
-        this.emitBotMessage(msg);
-      }
       return { selectedCards, bluffText: bluffValue };
     }
 
